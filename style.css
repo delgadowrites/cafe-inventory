@@ -111,6 +111,23 @@ h1 {
   background: #00702a; /* green */
 }
 
+/* While a save is going, the item's buttons are off: fade them slightly
+   (the selected color still shows) and show a "wait" cursor. */
+.status-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* "Didn't save, tap again": white on solid red, bold, impossible to miss. */
+.save-error {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  font-weight: bold;
+  color: #fff;
+  background: #b00020;
+  border-radius: 6px;
+}
+
 /* ---------- Tabs ---------- */
 
 /* Two equal-width tab buttons across the top. */
