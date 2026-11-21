@@ -30,7 +30,7 @@ For example, we might run out of avocado, which several menu items need, and res
 
 **Goals (v1)**
 
-1. Give the cafe one shared, up-to-date view of what is out, low, or in stock: ingredients, cleaning products and packaging (45 items in 10 categories).
+1. Give the cafe one shared, up-to-date view of what is out, low, or in stock: ingredients, cleaning products and packaging (46 items in 10 categories).
 2. Make updating an item fast enough to do mid-shift: one tap, no login.
 3. Replace the end-of-shift paper count with a phone walk-through.
 4. Give the GM a shopping list (red, then yellow) before each supply run.
