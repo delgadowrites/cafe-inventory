@@ -99,7 +99,7 @@ function renderList(items) {
   listEl.replaceChildren(); // clear "Loading..." or an old list
 
   if (items.length === 0) {
-    showMessage("No items found.");
+    showMessage(listEl, "No items found.");
     return;
   }
 
@@ -213,28 +213,155 @@ async function saveStatus(li, id, status) {
   showStatus(li, data.status);
 }
 
-// Shows a single line of text in place of the list
+// Shows a single line of text in place of a list
 // (used for "Loading..." and for errors).
-function showMessage(text) {
+// `container` is where it goes: listEl (Count) or dashboardListEl.
+function showMessage(container, text) {
   const p = document.createElement("p");
   p.className = "message";
   p.textContent = text;
-  listEl.replaceChildren(p);
+  container.replaceChildren(p);
 }
 
 // ---------------------------------------------------------------------
-// 7. Start the app
+// 7. Tabs: Count and Dashboard
 // ---------------------------------------------------------------------
-async function start() {
-  showMessage("Loading...");
+const countTab = document.getElementById("tab-count");
+const dashboardTab = document.getElementById("tab-dashboard");
+const countView = document.getElementById("count-view");
+const dashboardView = document.getElementById("dashboard-view");
+
+// Shows one tab's panel and hides the other.
+// aria-selected marks the open tab (the CSS styles it); `hidden` hides
+// the closed panel completely.
+function showTab(name) {
+  const isDashboard = name === "dashboard";
+  countTab.setAttribute("aria-selected", String(!isDashboard));
+  dashboardTab.setAttribute("aria-selected", String(isDashboard));
+  countView.hidden = isDashboard;
+  dashboardView.hidden = !isDashboard;
+}
+
+countTab.addEventListener("click", () => showTab("count"));
+
+// Opening the Dashboard always loads fresh data from the database,
+// so it shows what every phone (and the Table Editor) has saved.
+dashboardTab.addEventListener("click", () => {
+  showTab("dashboard");
+  loadDashboard();
+});
+
+// ---------------------------------------------------------------------
+// 8. Dashboard: the GM's shopping list
+// ---------------------------------------------------------------------
+const dashboardListEl = document.getElementById("dashboard-list");
+const refreshButton = document.getElementById("refresh-button");
+
+// Section headings for each status, in the order they appear.
+const DASHBOARD_SECTIONS = [
+  { value: "out", label: "Out" },
+  { value: "low", label: "Low" },
+  { value: "good", label: "Good" },
+];
+
+// Counts dashboard loads. If the tab or Refresh is tapped again before
+// a load finishes, only the newest load is allowed to draw the list.
+let dashboardLoadNumber = 0;
+
+// The Refresh button reloads the data without reloading the page.
+refreshButton.addEventListener("click", loadDashboard);
+
+// Loads every item fresh from the database and draws the dashboard.
+async function loadDashboard() {
+  const thisLoad = ++dashboardLoadNumber;
+
+  // Show that a load is happening, and stop repeat taps meanwhile.
+  refreshButton.disabled = true;
+  refreshButton.textContent = "Refreshing...";
+  showMessage(dashboardListEl, "Loading...");
+
   try {
-    await ensureSignedIn();
+    await signedIn;
+    const items = await loadItems();
+    if (thisLoad === dashboardLoadNumber) renderDashboard(items);
+  } catch (err) {
+    console.error("Could not load the dashboard:", err);
+    if (thisLoad === dashboardLoadNumber) {
+      showMessage(dashboardListEl, "Couldn't load the dashboard. Check the connection and tap Refresh.");
+    }
+  } finally {
+    // Turn the button back on once the newest load is done (or failed).
+    if (thisLoad === dashboardLoadNumber) {
+      refreshButton.disabled = false;
+      refreshButton.textContent = "Refresh";
+    }
+  }
+}
+
+// Draws Out, then Low, then Good. Inside each status, items are grouped
+// by category in shelf order (loadItems already sorted them by
+// sort_order, and filtering keeps that order).
+//   <section class="status-section status-out">
+//     <h2>Out (3)</h2>
+//     <h3>Dairy</h3> <ul><li>Milk</li>...</ul>
+function renderDashboard(items) {
+  dashboardListEl.replaceChildren();
+
+  for (const status of DASHBOARD_SECTIONS) {
+    const statusItems = items.filter((item) => item.status === status.value);
+
+    const section = document.createElement("section");
+    // status-out / status-low / status-good set the red/yellow/green color.
+    section.className = `status-section status-${status.value}`;
+
+    const heading = document.createElement("h2");
+    heading.textContent = `${status.label} (${statusItems.length})`;
+    section.appendChild(heading);
+
+    if (statusItems.length === 0) {
+      const none = document.createElement("p");
+      none.className = "none";
+      none.textContent = "None";
+      section.appendChild(none);
+    }
+
+    for (const [category, categoryItems] of groupByCategory(statusItems)) {
+      const categoryHeading = document.createElement("h3");
+      categoryHeading.textContent = category;
+      section.appendChild(categoryHeading);
+
+      const ul = document.createElement("ul");
+      for (const item of categoryItems) {
+        const li = document.createElement("li");
+        li.className = "dashboard-item";
+        li.textContent = item.name;
+        ul.appendChild(li);
+      }
+      section.appendChild(ul);
+    }
+
+    dashboardListEl.appendChild(section);
+  }
+}
+
+// ---------------------------------------------------------------------
+// 9. Start the app
+// ---------------------------------------------------------------------
+// Sign in once, and keep the promise so both tabs can wait on the same
+// sign-in. (Calling ensureSignedIn() twice at the same moment on a first
+// visit could create two anonymous users.)
+const signedIn = ensureSignedIn();
+
+async function start() {
+  showMessage(listEl, "Loading...");
+  try {
+    await signedIn;
     const items = await loadItems();
     renderList(items);
   } catch (err) {
     // Log the details for debugging, and tell the user in plain words.
     console.error("Could not load the item list:", err);
-    showMessage("Couldn't load the item list. Check the connection and refresh.");
+    showMessage(listEl, "Couldn't load the item list. Check the connection and refresh.");
   }
 }
 

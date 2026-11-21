@@ -96,6 +96,112 @@ h1 {
   background: #00702a; /* green */
 }
 
+/* ---------- Tabs ---------- */
+
+/* Two equal-width tab buttons across the top. */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 640px;
+  margin-bottom: 8px;
+  border: 3px solid #000;
+}
+
+.tab {
+  min-height: 52px;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #000;
+  background: #fff;
+  border: 0;
+  cursor: pointer;
+}
+
+/* The open tab is filled black, so it's obvious which one you're on. */
+.tab[aria-selected="true"] {
+  color: #fff;
+  background: #000;
+}
+
+/* Make sure `hidden` panels stay hidden. */
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Dashboard ---------- */
+
+#dashboard-view {
+  max-width: 640px;
+}
+
+/* Full-width Refresh button. */
+.refresh-button {
+  width: 100%;
+  min-height: 48px;
+  margin: 8px 0;
+  font: inherit;
+  font-weight: bold;
+  color: #000;
+  background: #fff;
+  border: 3px solid #000;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.refresh-button:disabled {
+  color: #555;
+  border-color: #555;
+}
+
+/* One block per status, with a thick colored border on the left. */
+.status-section {
+  margin-top: 20px;
+  border-left: 10px solid #000;
+  padding-left: 12px;
+}
+
+/* Status heading: a solid colored band (same colors as the Count buttons). */
+.status-section h2 {
+  font-size: 1.3rem;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.status-out { border-left-color: #b00020; }
+.status-out h2 { color: #fff; background: #b00020; } /* red */
+
+.status-low { border-left-color: #ffd400; }
+.status-low h2 { color: #000; background: #ffd400; } /* yellow */
+
+.status-good { border-left-color: #00702a; }
+.status-good h2 { color: #fff; background: #00702a; } /* green */
+
+/* Category heading inside a status: bold, underlined with a rule. */
+.status-section h3 {
+  font-size: 1.05rem;
+  margin: 14px 0 0;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #000;
+}
+
+.status-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #999;
+}
+
+/* "None" under an empty status. */
+.none {
+  margin: 8px 0;
+  font-style: italic;
+}
+
 /* "Loading..." and error messages. */
 .message {
   font-weight: bold;
