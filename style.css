@@ -1,55 +1,143 @@
 /* =====================================================================
    Cafe Kitchen Inventory - style.css
-   Basic phone-first, high-contrast layout. Fuller styling is issue #7.
+   Phone-first, high-contrast styling for reading at arm's length
+   mid-shift (issue #7).
    ===================================================================== */
+
+/* ---------- Colors (one place, used on both tabs) ---------- */
+/* Each status color has a matching text color chosen for contrast:
+   white on red  ~ 7:1, black on yellow ~ 14:1, white on green ~ 6:1
+   (all above the WCAG AA minimum of 4.5:1). */
+:root {
+  --out: #b00020;        /* red */
+  --out-text: #fff;
+  --low: #ffd400;        /* yellow */
+  --low-text: #000;
+  --good: #00702a;       /* green */
+  --good-text: #fff;
+
+  --ink: #000;           /* main text and borders */
+  --muted: #333;         /* secondary text, e.g. "15m ago" (~12:1 on white) */
+  --paper: #fff;         /* page background */
+  --focus: #0050c8;      /* keyboard focus ring */
+
+  /* Always light: stop phones in dark mode from recoloring the page. */
+  color-scheme: light;
+}
+
+/* ---------- Base ---------- */
 
 /* Include padding and borders in an element's width (easier sizing). */
 * {
   box-sizing: border-box;
 }
 
-/* Large, plain text: black on white for maximum contrast. */
+/* Keep iPhones from resizing text on their own when the phone rotates. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Large, plain text: black on white. 20px is readable at arm's length. */
 body {
   margin: 0;
-  padding: 0 16px 32px;
+  padding: 0 16px 48px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 18px;
-  line-height: 1.4;
-  color: #000;
-  background: #fff;
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--ink);
+  background: var(--paper);
 }
 
 h1 {
-  font-size: 1.6rem;
-  margin: 16px 0;
+  font-size: 1.5rem;
+  margin: 16px 0 12px;
 }
 
-/* Keep the list a readable width on bigger screens; full width on phones. */
-#item-list {
+/* Keep everything a readable width on bigger screens; full width on phones. */
+.tabs,
+main {
   max-width: 640px;
 }
 
-/* Category headings: bold, with a solid dark band so they're easy to scan. */
-.category h2 {
-  font-size: 1.2rem;
-  margin: 24px 0 0;
-  padding: 8px 12px;
-  color: #fff;
-  background: #000;
+/* Shared button basics: use the page font, no double-tap zoom delay. */
+button {
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
-/* Remove the default bullets and indentation from the item list. */
-.category ul {
+/* A clear ring around whatever has keyboard focus. */
+button:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Make sure `hidden` elements stay hidden. */
+[hidden] {
+  display: none !important;
+}
+
+/* "Loading..." and load-error messages. */
+.message {
+  font-weight: bold;
+}
+
+/* ---------- Tabs ---------- */
+
+/* Two equal-width tabs across the top, in a thick black frame. */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 8px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab {
+  min-height: 56px;
+  font-size: 1.1rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 0;
+}
+
+/* The open tab is filled black, so it's obvious which one you're on. */
+.tab[aria-selected="true"] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/* ---------- Count tab ---------- */
+
+/* Category heading: a solid black band. It sticks to the top of the
+   screen while you scroll through that category, so you always know
+   which shelf you're on. */
+.category h2 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 1.2rem;
+  margin: 20px 0 0;
+  padding: 10px 12px;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/* Remove the default bullets and indentation from item lists. */
+.category ul,
+.status-section ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-/* One row per item, at least 44px tall, with a divider line between rows. */
+/* One item: name + time, then buttons, with a divider line below. */
 .item {
-  min-height: 44px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #000;
+  padding: 12px 4px 14px;
+  border-bottom: 2px solid var(--ink);
 }
 
 /* Top line of an item: name on the left, last-updated time on the right. */
@@ -61,17 +149,15 @@ h1 {
   margin-bottom: 8px;
 }
 
-/* Item name: bold so it stands out above the buttons. */
 .item-name {
   font-weight: bold;
 }
 
-/* "15m ago": smaller than the name, but still dark enough to read easily
-   (#333 on white is well above the WCAG AA contrast minimum). */
+/* "15m ago": a bit smaller than the name, still high contrast. */
 .updated {
   flex-shrink: 0; /* never wrap or squash "2h ago" */
-  font-size: 0.95rem;
-  color: #333;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 /* The three status buttons side by side, sharing the row's width. */
@@ -81,37 +167,46 @@ h1 {
   gap: 8px;
 }
 
-/* Unselected button: white with a thick black border, 48px tall
-   (above the 44px minimum tap target). */
+/* Unselected button: white with a black border.
+   56px tall, well above the 44px minimum tap target. */
 .status-button {
-  min-height: 48px;
-  font: inherit;
-  font-weight: bold;
-  color: #000;
-  background: #fff;
-  border: 3px solid #000;
-  border-radius: 6px;
-  cursor: pointer;
+  min-height: 56px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
 }
 
-/* Selected button: filled with its status color.
-   (Final colors are tuned in issue #7.) */
+/* Quick feedback while a finger is on the button. */
+.status-button:active {
+  background: #e6e6e6;
+}
+
+/* Selected button: filled with its status color and a check mark, so
+   it's obvious at a glance (and doesn't rely on color alone). */
+.status-button[aria-pressed="true"]::before {
+  content: "\2713\00a0"; /* check mark + non-breaking space */
+}
+
 .status-button[data-status="out"][aria-pressed="true"] {
-  color: #fff;
-  background: #b00020; /* red */
+  color: var(--out-text);
+  background: var(--out);
+  border-color: var(--out);
 }
 
 .status-button[data-status="low"][aria-pressed="true"] {
-  color: #000;
-  background: #ffd400; /* yellow */
+  color: var(--low-text);
+  background: var(--low);
+  border-color: var(--ink); /* yellow needs a dark edge to stand out on white */
 }
 
 .status-button[data-status="good"][aria-pressed="true"] {
-  color: #fff;
-  background: #00702a; /* green */
+  color: var(--good-text);
+  background: var(--good);
+  border-color: var(--good);
 }
 
-/* While a save is going, the item's buttons are off: fade them slightly
+/* While a save is going, the item's buttons are off: fade them a little
    (the selected color still shows) and show a "wait" cursor. */
 .status-button:disabled {
   opacity: 0.55;
@@ -120,107 +215,72 @@ h1 {
 
 /* "Didn't save, tap again": white on solid red, bold, impossible to miss. */
 .save-error {
-  margin: 8px 0 0;
-  padding: 8px 12px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
   font-weight: bold;
-  color: #fff;
-  background: #b00020;
-  border-radius: 6px;
+  color: var(--out-text);
+  background: var(--out);
+  border-radius: 8px;
 }
 
-/* ---------- Tabs ---------- */
-
-/* Two equal-width tab buttons across the top. */
-.tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  max-width: 640px;
-  margin-bottom: 8px;
-  border: 3px solid #000;
-}
-
-.tab {
-  min-height: 52px;
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: #000;
-  background: #fff;
-  border: 0;
-  cursor: pointer;
-}
-
-/* The open tab is filled black, so it's obvious which one you're on. */
-.tab[aria-selected="true"] {
-  color: #fff;
-  background: #000;
-}
-
-/* Make sure `hidden` panels stay hidden. */
-[hidden] {
-  display: none !important;
-}
-
-/* ---------- Dashboard ---------- */
-
-#dashboard-view {
-  max-width: 640px;
-}
+/* ---------- Dashboard tab ---------- */
 
 /* Full-width Refresh button. */
 .refresh-button {
   width: 100%;
-  min-height: 48px;
+  min-height: 56px;
   margin: 8px 0;
-  font: inherit;
-  font-weight: bold;
-  color: #000;
-  background: #fff;
-  border: 3px solid #000;
-  border-radius: 6px;
-  cursor: pointer;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
 }
 
+.refresh-button:active {
+  background: #e6e6e6;
+}
+
+/* Grayed out (still readable) while refreshing. */
 .refresh-button:disabled {
   color: #555;
   border-color: #555;
+  cursor: wait;
 }
 
-/* One block per status, with a thick colored border on the left. */
+/* One block per status, with a thick colored stripe down the left. */
 .status-section {
-  margin-top: 20px;
-  border-left: 10px solid #000;
+  margin-top: 24px;
   padding-left: 12px;
+  border-left: 10px solid var(--ink);
 }
 
-/* Status heading: a solid colored band (same colors as the Count buttons). */
+/* Status heading ("Out (3)"): a solid colored band. Like the Count tab's
+   category headings, it sticks to the top while you scroll its items. */
 .status-section h2 {
-  font-size: 1.3rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 1.35rem;
   margin: 0;
-  padding: 8px 12px;
+  padding: 10px 12px;
 }
 
-.status-out { border-left-color: #b00020; }
-.status-out h2 { color: #fff; background: #b00020; } /* red */
+/* Same colors as the Count buttons. */
+.status-out { border-left-color: var(--out); }
+.status-out h2 { color: var(--out-text); background: var(--out); }
 
-.status-low { border-left-color: #ffd400; }
-.status-low h2 { color: #000; background: #ffd400; } /* yellow */
+.status-low { border-left-color: var(--low); }
+.status-low h2 { color: var(--low-text); background: var(--low); }
 
-.status-good { border-left-color: #00702a; }
-.status-good h2 { color: #fff; background: #00702a; } /* green */
+.status-good { border-left-color: var(--good); }
+.status-good h2 { color: var(--good-text); background: var(--good); }
 
-/* Category heading inside a status: bold, underlined with a rule. */
+/* Category heading inside a status: bold, with a rule underneath. */
 .status-section h3 {
   font-size: 1.05rem;
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   padding-bottom: 4px;
-  border-bottom: 2px solid #000;
-}
-
-.status-section ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  border-bottom: 3px solid var(--ink);
 }
 
 /* Dashboard row: name on the left, last-updated time on the right. */
@@ -229,17 +289,12 @@ h1 {
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #999;
+  padding: 10px 0;
+  border-bottom: 1px solid #666;
 }
 
 /* "None" under an empty status. */
 .none {
-  margin: 8px 0;
-  font-style: italic;
-}
-
-/* "Loading..." and error messages. */
-.message {
-  font-weight: bold;
+  margin: 10px 0;
+  color: var(--muted);
 }
