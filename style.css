@@ -52,6 +52,50 @@ h1 {
   border-bottom: 1px solid #000;
 }
 
+/* Item name: bold so it stands out above the buttons. */
+.item-name {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+/* The three status buttons side by side, sharing the row's width. */
+.status-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* Unselected button: white with a thick black border, 48px tall
+   (above the 44px minimum tap target). */
+.status-button {
+  min-height: 48px;
+  font: inherit;
+  font-weight: bold;
+  color: #000;
+  background: #fff;
+  border: 3px solid #000;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Selected button: filled with its status color.
+   (Final colors are tuned in issue #7.) */
+.status-button[data-status="out"][aria-pressed="true"] {
+  color: #fff;
+  background: #b00020; /* red */
+}
+
+.status-button[data-status="low"][aria-pressed="true"] {
+  color: #000;
+  background: #ffd400; /* yellow */
+}
+
+.status-button[data-status="good"][aria-pressed="true"] {
+  color: #fff;
+  background: #00702a; /* green */
+}
+
 /* "Loading..." and error messages. */
 .message {
   font-weight: bold;

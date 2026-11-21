@@ -21,6 +21,20 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 // The <main id="item-list"> element we fill with the list.
 const listEl = document.getElementById("item-list");
 
+// The three statuses, in the order the buttons appear.
+// `value` is what's stored in the database; `label` is the button text.
+const STATUSES = [
+  { value: "out", label: "Out" },
+  { value: "low", label: "Low" },
+  { value: "good", label: "Good" },
+];
+
+// The last saved version of each item we know about, by id (as text,
+// because that's how ids come back from the page's data-id attributes).
+// Used to decide whether a save response is newer than what's shown
+// (see saveStatus below).
+const itemsById = new Map();
+
 // ---------------------------------------------------------------------
 // 2. Make sure we're signed in (anonymously)
 // ---------------------------------------------------------------------
@@ -100,16 +114,103 @@ function renderList(items) {
 
     const ul = document.createElement("ul");
     for (const item of categoryItems) {
-      const li = document.createElement("li");
-      li.className = "item";
-      li.dataset.id = item.id; // handy later for saving a status (#2)
-      li.textContent = item.name;
-      ul.appendChild(li);
+      itemsById.set(String(item.id), item); // remember the saved version
+      ul.appendChild(renderItem(item));
     }
     section.appendChild(ul);
 
     listEl.appendChild(section);
   }
+}
+
+// Builds one item row: the name, then the Out / Low / Good buttons.
+//   <li class="item" data-id="12">
+//     <span class="item-name">Milk</span>
+//     <div class="status-buttons">
+//       <button data-status="out" aria-pressed="false">Out</button> ...
+function renderItem(item) {
+  const li = document.createElement("li");
+  li.className = "item";
+  li.dataset.id = item.id; // tells the click handler which item was tapped
+
+  const name = document.createElement("span");
+  name.className = "item-name";
+  name.textContent = item.name;
+  li.appendChild(name);
+
+  const buttons = document.createElement("div");
+  buttons.className = "status-buttons";
+  for (const status of STATUSES) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "status-button";
+    button.dataset.status = status.value;
+    button.textContent = status.label;
+    buttons.appendChild(button);
+  }
+  li.appendChild(buttons);
+
+  showStatus(li, item.status);
+  return li;
+}
+
+// Highlights the button matching `status` in one item row.
+// aria-pressed="true" marks the selected button: the CSS colors it,
+// and screen readers announce it as "pressed".
+function showStatus(li, status) {
+  for (const button of li.querySelectorAll(".status-button")) {
+    const selected = button.dataset.status === status;
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+// ---------------------------------------------------------------------
+// 6. Save a status when a button is tapped
+// ---------------------------------------------------------------------
+// One click listener on the whole list (instead of one per button).
+// It finds which button and which item row the tap landed on.
+listEl.addEventListener("click", (event) => {
+  const button = event.target.closest(".status-button");
+  if (!button) return; // the tap wasn't on a status button
+
+  const li = button.closest(".item");
+  saveStatus(li, li.dataset.id, button.dataset.status);
+});
+
+// Saves the status to the database, THEN updates the page.
+// The highlight only moves after the database confirms the save, so
+// the page never shows a status that wasn't saved.
+// Tapping the status that's already selected still saves: the database
+// trigger refreshes updated_at (the "still good" check).
+async function saveStatus(li, id, status) {
+  // .select().single() asks the database to send back the saved row.
+  // If the update was refused or matched no row, .single() returns an
+  // error instead of silently doing nothing.
+  const { data, error } = await db
+    .from("items")
+    .update({ status: status })
+    .eq("id", id)
+    .select("id, status, updated_at")
+    .single();
+
+  if (error) {
+    // Nothing changes on the page: the old status stays highlighted.
+    // (Issue #6 adds a visible "Didn't save, tap again" message.)
+    console.error(`Could not save "${status}" for item ${id}:`, error);
+    return;
+  }
+
+  // Last save wins: if two taps on the same item land close together,
+  // their responses can come back in either order. Only show this
+  // result if it's at least as new as the last saved one we've shown,
+  // so the page matches what's in the database.
+  const shown = itemsById.get(id);
+  if (shown && new Date(data.updated_at) < new Date(shown.updated_at)) {
+    return; // an older save answered late; a newer one is already shown
+  }
+
+  itemsById.set(id, { ...shown, ...data });
+  showStatus(li, data.status);
 }
 
 // Shows a single line of text in place of the list
@@ -122,7 +223,7 @@ function showMessage(text) {
 }
 
 // ---------------------------------------------------------------------
-// 6. Start the app
+// 7. Start the app
 // ---------------------------------------------------------------------
 async function start() {
   showMessage("Loading...");
