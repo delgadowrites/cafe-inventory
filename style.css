@@ -52,11 +52,26 @@ h1 {
   border-bottom: 1px solid #000;
 }
 
+/* Top line of an item: name on the left, last-updated time on the right. */
+.item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 /* Item name: bold so it stands out above the buttons. */
 .item-name {
-  display: block;
   font-weight: bold;
-  margin-bottom: 8px;
+}
+
+/* "15m ago": smaller than the name, but still dark enough to read easily
+   (#333 on white is well above the WCAG AA contrast minimum). */
+.updated {
+  flex-shrink: 0; /* never wrap or squash "2h ago" */
+  font-size: 0.95rem;
+  color: #333;
 }
 
 /* The three status buttons side by side, sharing the row's width. */
@@ -191,7 +206,12 @@ h1 {
   padding: 0;
 }
 
+/* Dashboard row: name on the left, last-updated time on the right. */
 .dashboard-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid #999;
 }
