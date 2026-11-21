@@ -4,7 +4,7 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 
 - **Live app:** https://delgadowrites.github.io/cafe-inventory/
 - **Printable QR code for the wall:** https://delgadowrites.github.io/cafe-inventory/qr.html
-- **PRD:** <!-- TODO: paste the PRD link here --> _link to be added_
+- **PRD:** [docs/PRD.md](docs/PRD.md)
 - **Launch checklist:** [docs/launch-checklist.md](docs/launch-checklist.md)
 
 ## What it does

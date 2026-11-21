@@ -5,9 +5,8 @@ Target: **Wed, Nov 25**. These are the in-person steps for going live. Tick them
 ## 1. Before the cafe (desk)
 - [ ] All PRs for #1–#7 merged; https://delgadowrites.github.io/cafe-inventory/ shows the Count and Dashboard tabs, with times
 - [ ] All three `sql/` files have been run in the Supabase SQL Editor (01, 02, 03)
-- [ ] The item list matches the Final List. The database currently has **46** items and the issue says **45**: check whether **Blueberries** (`sort_order` 45, between Potatoes and Strawberries) is real or a leftover test row
+- [ ] The GM confirms the final item list: **46 items** (the 45 from the Final List, plus **Blueberries**, which was missing from it). This is an open question in the PRD.
 - [ ] Print `qr.html` (one copy for the wall, one spare)
-- [ ] Add the PRD link to the README
 
 ## 2. Full test on a real phone, in the kitchen, on the cafe wifi
 Use a phone that's on the **cafe wifi**, not mobile data.
