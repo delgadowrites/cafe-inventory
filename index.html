@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <!-- Makes the page fit phone screens instead of showing a zoomed-out desktop page -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cafe Inventory</title>
+  <!-- Page styles (phone-first, high contrast) -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>Kitchen Inventory</h1>
+
+  <!-- JavaScript fills this with a heading and items for each category -->
+  <main id="item-list"></main>
+
+  <!-- Supabase library first (from the CDN), then your script, which uses it -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>
