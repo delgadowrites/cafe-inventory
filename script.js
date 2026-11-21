@@ -123,9 +123,13 @@ function renderList(items) {
   }
 }
 
-// Builds one item row: the name, then the Out / Low / Good buttons.
+// Builds one item row: the name and last-updated time, then the
+// Out / Low / Good buttons.
 //   <li class="item" data-id="12">
-//     <span class="item-name">Milk</span>
+//     <div class="item-head">
+//       <span class="item-name">Milk</span>
+//       <span class="updated" data-updated="2026-11-21T...">15m ago</span>
+//     </div>
 //     <div class="status-buttons">
 //       <button data-status="out" aria-pressed="false">Out</button> ...
 function renderItem(item) {
@@ -133,10 +137,16 @@ function renderItem(item) {
   li.className = "item";
   li.dataset.id = item.id; // tells the click handler which item was tapped
 
+  // Top line: name on the left, "15m ago" on the right.
+  const head = document.createElement("div");
+  head.className = "item-head";
+
   const name = document.createElement("span");
   name.className = "item-name";
   name.textContent = item.name;
-  li.appendChild(name);
+  head.appendChild(name);
+  head.appendChild(renderUpdated(item.updated_at));
+  li.appendChild(head);
 
   const buttons = document.createElement("div");
   buttons.className = "status-buttons";
@@ -211,7 +221,55 @@ async function saveStatus(li, id, status) {
 
   itemsById.set(id, { ...shown, ...data });
   showStatus(li, data.status);
+  // Show the new saved time ("just now") from the database's answer.
+  setUpdated(li.querySelector(".updated"), data.updated_at);
 }
+
+// ---------------------------------------------------------------------
+// 6b. "Last updated" times ("just now", "15m ago", "2h ago", "3d ago")
+// ---------------------------------------------------------------------
+// Turns a saved time (updated_at from the database) into short text.
+function timeAgo(isoTime) {
+  const seconds = (Date.now() - new Date(isoTime).getTime()) / 1000;
+
+  // Under a minute, or slightly in the future (if this phone's clock is
+  // a little behind the database's clock), counts as "just now".
+  if (seconds < 60) return "just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// Makes the <span class="updated"> for one item. The exact time is kept
+// in data-updated so the text can be refreshed later (see below).
+function renderUpdated(isoTime) {
+  const span = document.createElement("span");
+  span.className = "updated";
+  setUpdated(span, isoTime);
+  return span;
+}
+
+// Sets a time span to a new saved time.
+// The `title` shows the exact date and time on hover (desktop).
+function setUpdated(span, isoTime) {
+  span.dataset.updated = isoTime;
+  span.textContent = timeAgo(isoTime);
+  span.title = new Date(isoTime).toLocaleString();
+}
+
+// "just now" should become "1m ago" without a reload, so once a minute
+// recompute every time on the page from its data-updated value.
+setInterval(() => {
+  for (const span of document.querySelectorAll(".updated")) {
+    span.textContent = timeAgo(span.dataset.updated);
+  }
+}, 60 * 1000);
 
 // Shows a single line of text in place of a list
 // (used for "Loading..." and for errors).
@@ -303,7 +361,7 @@ async function loadDashboard() {
 // sort_order, and filtering keeps that order).
 //   <section class="status-section status-out">
 //     <h2>Out (3)</h2>
-//     <h3>Dairy</h3> <ul><li>Milk</li>...</ul>
+//     <h3>Dairy</h3> <ul><li>Milk <span class="updated">2h ago</span></li>...</ul>
 function renderDashboard(items) {
   dashboardListEl.replaceChildren();
 
@@ -332,9 +390,13 @@ function renderDashboard(items) {
 
       const ul = document.createElement("ul");
       for (const item of categoryItems) {
+        // Name on the left, "15m ago" on the right.
         const li = document.createElement("li");
         li.className = "dashboard-item";
-        li.textContent = item.name;
+        const name = document.createElement("span");
+        name.textContent = item.name;
+        li.appendChild(name);
+        li.appendChild(renderUpdated(item.updated_at));
         ul.appendChild(li);
       }
       section.appendChild(ul);
