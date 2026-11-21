@@ -132,6 +132,8 @@ function renderList(items) {
 //     </div>
 //     <div class="status-buttons">
 //       <button data-status="out" aria-pressed="false">Out</button> ...
+//     </div>
+//     <p class="save-error" hidden>Didn't save, tap again</p>
 function renderItem(item) {
   const li = document.createElement("li");
   li.className = "item";
@@ -160,6 +162,15 @@ function renderItem(item) {
   }
   li.appendChild(buttons);
 
+  // Hidden until a save fails. role="alert" makes screen readers
+  // announce it as soon as it appears.
+  const error = document.createElement("p");
+  error.className = "save-error";
+  error.setAttribute("role", "alert");
+  error.textContent = "Didn't save, tap again";
+  error.hidden = true;
+  li.appendChild(error);
+
   showStatus(li, item.status);
   return li;
 }
@@ -187,42 +198,75 @@ listEl.addEventListener("click", (event) => {
   saveStatus(li, li.dataset.id, button.dataset.status);
 });
 
+// How long to wait for a save before giving up. Kitchen wifi can hang
+// instead of failing, and the buttons stay off while a save is going,
+// so without a limit an item could stay stuck.
+const SAVE_TIMEOUT_MS = 10 * 1000;
+
 // Saves the status to the database, THEN updates the page.
 // The highlight only moves after the database confirms the save, so
 // the page never shows a status that wasn't saved.
 // Tapping the status that's already selected still saves: the database
 // trigger refreshes updated_at (the "still good" check).
 async function saveStatus(li, id, status) {
-  // .select().single() asks the database to send back the saved row.
-  // If the update was refused or matched no row, .single() returns an
-  // error instead of silently doing nothing.
-  const { data, error } = await db
-    .from("items")
-    .update({ status: status })
-    .eq("id", id)
-    .select("id, status, updated_at")
-    .single();
+  // While this save is going, turn this item's buttons off, so a double
+  // tap sends only one save. Other items stay tappable.
+  setSaving(li, true);
 
-  if (error) {
-    // Nothing changes on the page: the old status stays highlighted.
-    // (Issue #6 adds a visible "Didn't save, tap again" message.)
-    console.error(`Could not save "${status}" for item ${id}:`, error);
-    return;
+  try {
+    // .select().single() asks the database to send back the saved row.
+    // If the update was refused or matched no row, .single() returns an
+    // error instead of silently doing nothing.
+    // .abortSignal() cancels the request if it takes too long.
+    const { data, error } = await db
+      .from("items")
+      .update({ status: status })
+      .eq("id", id)
+      .select("id, status, updated_at")
+      .single()
+      .abortSignal(AbortSignal.timeout(SAVE_TIMEOUT_MS));
+
+    if (error) throw error;
+
+    // Saved. Clear any earlier "Didn't save" message on this item.
+    showSaveError(li, false);
+
+    // Only show this result if it's at least as new as what's already
+    // shown, so the page always matches the newest save.
+    const shown = itemsById.get(id);
+    if (shown && new Date(data.updated_at) < new Date(shown.updated_at)) {
+      return;
+    }
+
+    itemsById.set(id, { ...shown, ...data });
+    showStatus(li, data.status);
+    // Show the new saved time ("just now") from the database's answer.
+    setUpdated(li.querySelector(".updated"), data.updated_at);
+  } catch (err) {
+    // Offline, timed out, or refused. Nothing else changes: the old
+    // status stays highlighted and the old time stays. The message tells
+    // staff the tap didn't count.
+    console.error(`Could not save "${status}" for item ${id}:`, err);
+    showSaveError(li, true);
+  } finally {
+    // Turn the buttons back on after a save, whether it worked or not.
+    setSaving(li, false);
   }
+}
 
-  // Last save wins: if two taps on the same item land close together,
-  // their responses can come back in either order. Only show this
-  // result if it's at least as new as the last saved one we've shown,
-  // so the page matches what's in the database.
-  const shown = itemsById.get(id);
-  if (shown && new Date(data.updated_at) < new Date(shown.updated_at)) {
-    return; // an older save answered late; a newer one is already shown
+// Turns one item's buttons off (while saving) or back on.
+// aria-busy tells screen readers the item is updating; the CSS also
+// fades the buttons a little while they're off.
+function setSaving(li, saving) {
+  for (const button of li.querySelectorAll(".status-button")) {
+    button.disabled = saving;
   }
+  li.setAttribute("aria-busy", String(saving));
+}
 
-  itemsById.set(id, { ...shown, ...data });
-  showStatus(li, data.status);
-  // Show the new saved time ("just now") from the database's answer.
-  setUpdated(li.querySelector(".updated"), data.updated_at);
+// Shows or hides the "Didn't save, tap again" message on one item.
+function showSaveError(li, show) {
+  li.querySelector(".save-error").hidden = !show;
 }
 
 // ---------------------------------------------------------------------
