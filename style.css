@@ -1,0 +1,58 @@
+/* =====================================================================
+   Cafe Kitchen Inventory - style.css
+   Basic phone-first, high-contrast layout. Fuller styling is issue #7.
+   ===================================================================== */
+
+/* Include padding and borders in an element's width (easier sizing). */
+* {
+  box-sizing: border-box;
+}
+
+/* Large, plain text: black on white for maximum contrast. */
+body {
+  margin: 0;
+  padding: 0 16px 32px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 18px;
+  line-height: 1.4;
+  color: #000;
+  background: #fff;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 16px 0;
+}
+
+/* Keep the list a readable width on bigger screens; full width on phones. */
+#item-list {
+  max-width: 640px;
+}
+
+/* Category headings: bold, with a solid dark band so they're easy to scan. */
+.category h2 {
+  font-size: 1.2rem;
+  margin: 24px 0 0;
+  padding: 8px 12px;
+  color: #fff;
+  background: #000;
+}
+
+/* Remove the default bullets and indentation from the item list. */
+.category ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* One row per item, at least 44px tall, with a divider line between rows. */
+.item {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #000;
+}
+
+/* "Loading..." and error messages. */
+.message {
+  font-weight: bold;
+}
