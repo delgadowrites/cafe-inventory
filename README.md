@@ -63,11 +63,23 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 ### Database permissions (`sql/`)
 | File | What it does |
 |---|---|
+| `00-schema.sql` | **New projects only.** Creates the `items` table (status check: out / low / good), turns on RLS, adds the read policy, and inserts the 46 items. Already done on the live project; see "Rebuild the database from scratch" below. |
 | `01-grant-read.sql` | Signed-in users can **read** `items` |
 | `02-update-status.sql` | Signed-in users can **update the `status` column only**, through an RLS update policy, plus a trigger that sets `updated_at` to the database time |
 | `03-keep-manual-updated-at.sql` | The trigger keeps an `updated_at` typed in by hand (for testing). App taps still get the database time. |
 
 Row Level Security is on. There are no insert or delete permissions for app users: items are only added or removed in the Table Editor.
+
+### Rebuild the database from scratch
+If the Supabase project is ever lost or paused for good, everything can be rebuilt from this repo:
+
+1. Create a **new** Supabase project (free tier).
+2. Turn on anonymous sign-ins: **Authentication** → **Sign In / Providers** → **Allow anonymous sign-ins**.
+3. In the **SQL Editor**, run the files in `sql/` in order, one at a time: `00-schema.sql`, `01-grant-read.sql`, `02-update-status.sql`, `03-keep-manual-updated-at.sql`. After `00`, its check queries should show 46 items in 10 categories.
+4. Copy the new project's URL and **publishable** key (**Project Settings** → **API Keys**) into `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of `script.js`, then commit to `main`.
+5. Retest: items load, a tap saves, the Dashboard loads.
+
+Every item starts as **Good** in the new project, so do a full walk to set the real statuses. Never run `00-schema.sql` on the live project: it would stop at "relation items already exists" and change nothing.
 
 ### Run it locally
 Serve the folder with any static server and open http://localhost:8000:
