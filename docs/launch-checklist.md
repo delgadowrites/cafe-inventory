@@ -10,7 +10,7 @@ Target: **Wed, Nov 25**. These are the in-person steps for going live. Tick them
 
 ## 2. Full test on a real phone, in the kitchen, on the cafe wifi
 Use a phone that's on the **cafe wifi**, not mobile data.
-- [ ] Scan the printed QR code: the app opens on **Count**
+- [ ] Scan the printed QR code: the app opens on **Count** (on a phone that hasn't used the app before; after that, it reopens on the last tab used)
 - [ ] Tap Out, Low, Good on one item: the ✓ moves each time, and the time shows "just now"
 - [ ] Refresh the page: the statuses are still there
 - [ ] Open **Dashboard**: that item is in the right section; tap **Refresh**

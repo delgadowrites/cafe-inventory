@@ -9,7 +9,7 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 
 ## What it does
 
-- Opens straight to the **Count** tab, with no login. Every kitchen item is listed under its category heading, in shelf order.
+- Opens with no login. **Each phone reopens on the tab it was last on** (Count or Dashboard); a phone opening it for the first time starts on **Count**. Only the tab is remembered, on that phone. Every kitchen item is listed under its category heading, in shelf order.
 - Each item has **Out / Low / Good** buttons and shows how long ago it was last updated ("just now", "15m ago", "2h ago", "3d ago").
 - A tap is saved to the database first. The highlight moves only when the save worked. If it didn't (bad wifi), the item says **"Didn't save, tap again"**.
 - The **Count** list reloads whenever it comes back into view: when the phone returns to the page (from another app, or after unlocking) and when you switch from Dashboard back to Count. Items being saved, or showing "Didn't save", are left as they are. If the reload fails, the list stays and a yellow bar says it couldn't be refreshed, with a **Try again** button.
@@ -19,13 +19,13 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 ## How to use it
 
 ### Kitchen staff (end of shift)
-1. Scan the QR code on the wall. The app opens on **Count**.
+1. Scan the QR code on the wall. The app opens on **Count** (it reopens on the tab your phone used last, so tap **Count** if it shows the Dashboard).
 2. Walk the shelves in order and tap **Out**, **Low** or **Good** for each item.
 3. If an item is still fine, tap **Good** again anyway. That refreshes its time, so the GM knows it was checked tonight.
 4. If you see **"Didn't save, tap again"**, tap the same button again. Wait for the ✓ to move before going on.
 
 ### GM (shopping and restocking)
-1. Open the app and tap **Dashboard**. Out items are at the top, then Low.
+1. Open the app and tap **Dashboard**. Out items are at the top, then Low. After the first time, your phone reopens straight on the Dashboard.
 2. Use it as the shopping list. Tap **Refresh** if staff are updating while you look.
 3. After restocking, go to **Count** and tap **Good** on each restocked item.
 

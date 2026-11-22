@@ -408,6 +408,38 @@ function showTab(name) {
   dashboardTab.setAttribute("aria-selected", String(isDashboard));
   countView.hidden = isDashboard;
   dashboardView.hidden = !isDashboard;
+  saveLastTab(isDashboard ? "dashboard" : "count");
+}
+
+// ---------------------------------------------------------------------
+// 7b. Remember the last tab on this phone (issue #25)
+// ---------------------------------------------------------------------
+// Cooks mostly use Count and the GM mostly uses the Dashboard, so each
+// phone reopens on the tab it was last on. Only the tab name is saved,
+// in this browser's localStorage (it stays on the phone; nothing is
+// sent anywhere). A phone that has never opened the app opens on Count.
+//
+// Some private-browsing modes block localStorage or throw an error when
+// it's touched, so every use is wrapped in try/catch: if storage doesn't
+// work, the app simply opens on Count each time.
+const LAST_TAB_KEY = "cafe-inventory:last-tab";
+
+function saveLastTab(name) {
+  try {
+    localStorage.setItem(LAST_TAB_KEY, name);
+  } catch {
+    // Storage not available: nothing to do, the app still works.
+  }
+}
+
+// Returns "dashboard" or "count". Anything else (nothing saved, an old
+// or unexpected value, storage blocked) means Count.
+function readLastTab() {
+  try {
+    return localStorage.getItem(LAST_TAB_KEY) === "dashboard" ? "dashboard" : "count";
+  } catch {
+    return "count";
+  }
 }
 
 // Coming back to Count from the Dashboard reloads the Count list, so it
@@ -635,4 +667,15 @@ window.addEventListener("pageshow", (event) => {
   if (event.persisted) reloadShownTab();
 });
 
-loadCount();
+// ---------------------------------------------------------------------
+// 11. Open on the last tab used (issue #25)
+// ---------------------------------------------------------------------
+// Load only the tab that opens. If it's the Dashboard, the Count list
+// loads when someone switches to Count (it shows "Loading..." then).
+if (readLastTab() === "dashboard") {
+  showTab("dashboard");
+  loadDashboard(); // fresh, the same as switching to it
+} else {
+  showTab("count");
+  loadCount();
+}
