@@ -14,19 +14,21 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 - A tap is saved to the database first. The highlight moves only when the save worked. If it didn't (bad wifi), the item says **"Didn't save, tap again"**.
 - The **Count** list reloads whenever it comes back into view: when the phone returns to the page (from another app, or after unlocking) and when you switch from Dashboard back to Count. Items being saved, or showing "Didn't save", are left as they are. If the reload fails, the list stays and a yellow bar says it couldn't be refreshed, with a **Try again** button.
 - The **Dashboard** tab lists everything that's **Out** (red), then **Low** (yellow), then **Good** (green), grouped by category. It loads fresh every time you open it, **Refresh** reloads it, and it reloads by itself when the phone comes back to the page (like Count). If that reload fails, the list stays and the same yellow "Couldn't refresh" bar appears.
+- **Headings fold.** On **Count**, tap a category heading to collapse or expand it. Every heading shows a summary, e.g. "Dairy (6) · 1 Out · 2 Low", so a collapsed category never hides a problem. On the **Dashboard**, **Good** starts collapsed ("Good (38) ▸") and Out and Low start open; tap any heading to open or close it.
+  - What's open or closed is never saved on the phone. Reloading the page, or switching tabs, puts the tab you open back to its defaults (Count: all expanded; Dashboard: Good closed). Leaving the app and coming back keeps everything as it was, including where you'd scrolled to.
 - Every phone sees the same statuses: the database is the one source of truth.
 
 ## How to use it
 
 ### Kitchen staff (end of shift)
 1. Scan the QR code on the wall. The app opens on **Count** (it reopens on the tab your phone used last, so tap **Count** if it shows the Dashboard).
-2. Walk the shelves in order and tap **Out**, **Low** or **Good** for each item.
+2. Walk the shelves in order and tap **Out**, **Low** or **Good** for each item. When a shelf is done, you can tap its category heading to fold it away.
 3. If an item is still fine, tap **Good** again anyway. That refreshes its time, so the GM knows it was checked tonight.
 4. If you see **"Didn't save, tap again"**, tap the same button again. Wait for the ✓ to move before going on.
 
 ### GM (shopping and restocking)
 1. Open the app and tap **Dashboard**. Out items are at the top, then Low. After the first time, your phone reopens straight on the Dashboard.
-2. Use it as the shopping list. Tap **Refresh** if staff are updating while you look.
+2. Use it as the shopping list. Tap **Refresh** if staff are updating while you look. **Good** items are folded away; tap the Good heading to see them.
 3. After restocking, go to **Count** and tap **Good** on each restocked item.
 
 ## Adding, removing or renaming items
