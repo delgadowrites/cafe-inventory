@@ -43,6 +43,12 @@
     <section id="dashboard-view" role="tabpanel" aria-labelledby="tab-dashboard" hidden>
       <button type="button" id="refresh-button" class="refresh-button">Refresh</button>
       <div id="dashboard-list"></div>
+      <!-- Same bar as the Count tab's: shown when a reload after coming
+           back to the page fails. The list on screen stays. -->
+      <div id="dashboard-notice" class="refresh-notice" role="status" hidden>
+        <p>Couldn't refresh the list. Statuses may be out of date.</p>
+        <button type="button" id="dashboard-retry" class="retry-button">Try again</button>
+      </div>
     </section>
   </main>
 

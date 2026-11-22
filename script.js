@@ -440,29 +440,60 @@ const DASHBOARD_SECTIONS = [
 ];
 
 // Counts dashboard loads. If the tab or Refresh is tapped again before
-// a load finishes, only the newest load is allowed to draw the list.
+// a load finishes (or the phone comes back to the page), only the newest
+// load is allowed to draw the list.
 let dashboardLoadNumber = 0;
 
+// The "Couldn't refresh the list" bar for the Dashboard and its
+// Try again button (same look as the Count tab's, issue #24).
+const dashboardNoticeEl = document.getElementById("dashboard-notice");
+document.getElementById("dashboard-retry").addEventListener("click", () => {
+  loadDashboard({ quiet: true });
+});
+
 // The Refresh button reloads the data without reloading the page.
-refreshButton.addEventListener("click", loadDashboard);
+refreshButton.addEventListener("click", () => loadDashboard());
 
 // Loads every item fresh from the database and draws the dashboard.
-async function loadDashboard() {
+//
+// Two kinds of load:
+//   * Normal (opening the tab, tapping Refresh): shows "Loading..." and
+//     "Refreshing...", and replaces the list with an error if it fails.
+//   * Quiet (`{ quiet: true }`: coming back to the page, Try again):
+//     the list on screen stays while it loads. If it fails, the list
+//     stays and the "Couldn't refresh" bar appears instead (issue #24).
+async function loadDashboard({ quiet = false } = {}) {
   const thisLoad = ++dashboardLoadNumber;
 
-  // Show that a load is happening, and stop repeat taps meanwhile.
-  refreshButton.disabled = true;
-  refreshButton.textContent = "Refreshing...";
-  showMessage(dashboardListEl, "Loading...");
+  // Is a list already on screen? A quiet load with nothing to keep
+  // (e.g. the last load failed) behaves like a normal one.
+  const hasList = dashboardListEl.querySelector(".status-section") !== null;
+  const keepList = quiet && hasList;
+
+  if (!keepList) {
+    // Show that a load is happening, and stop repeat taps meanwhile.
+    refreshButton.disabled = true;
+    refreshButton.textContent = "Refreshing...";
+    showMessage(dashboardListEl, "Loading...");
+  }
 
   try {
     await signedIn;
     const items = await loadItems();
-    if (thisLoad === dashboardLoadNumber) renderDashboard(items);
+    if (thisLoad === dashboardLoadNumber) {
+      renderDashboard(items);
+      dashboardNoticeEl.hidden = true; // the list is fresh again
+    }
   } catch (err) {
     console.error("Could not load the dashboard:", err);
     if (thisLoad === dashboardLoadNumber) {
-      showMessage(dashboardListEl, "Couldn't load the dashboard. Check the connection and tap Refresh.");
+      if (keepList) {
+        // Keep the list that's on screen (it may be old), and say so.
+        dashboardNoticeEl.hidden = false;
+      } else {
+        dashboardNoticeEl.hidden = true; // the message below says it all
+        showMessage(dashboardListEl, "Couldn't load the dashboard. Check the connection and tap Refresh.");
+      }
     }
   } finally {
     // Turn the button back on once the newest load is done (or failed).
@@ -480,6 +511,8 @@ async function loadDashboard() {
 //     <h2>Out (3)</h2>
 //     <h3>Dairy</h3> <ul><li>Milk <span class="updated">2h ago</span></li>...</ul>
 function renderDashboard(items) {
+  // Keep the scroll position across a reload (the list is rebuilt).
+  const scrollY = window.scrollY;
   dashboardListEl.replaceChildren();
 
   for (const status of DASHBOARD_SECTIONS) {
@@ -521,6 +554,10 @@ function renderDashboard(items) {
 
     dashboardListEl.appendChild(section);
   }
+
+  // Emptying the list above shrank the page and scrolled it up; now
+  // that the new list is in, put the scroll back.
+  window.scrollTo(0, scrollY);
 }
 
 // ---------------------------------------------------------------------
@@ -575,19 +612,27 @@ async function loadCount() {
   }
 }
 
-// Reload when the phone comes back to this page (from another app or
-// tab, or after unlocking), if the Count tab is the one showing.
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && !countView.hidden) {
+// Reloads whichever tab is showing, and only that one (one load per
+// return): Count (issue #18) or the Dashboard, quietly (issue #24).
+function reloadShownTab() {
+  if (!countView.hidden) {
     loadCount();
+  } else {
+    loadDashboard({ quiet: true });
   }
+}
+
+// Reload when the phone comes back to this page (from another app or
+// tab, or after unlocking).
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") reloadShownTab();
 });
 
 // Some phones (Safari especially) restore a page from memory when you
 // go Back to it, without reloading it. Treat that as coming back too.
-// (If visibilitychange also fires, the load counter keeps only one.)
+// (If visibilitychange also fires, the load counters keep only one.)
 window.addEventListener("pageshow", (event) => {
-  if (event.persisted && !countView.hidden) loadCount();
+  if (event.persisted) reloadShownTab();
 });
 
 loadCount();
