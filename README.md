@@ -12,6 +12,7 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 - Opens straight to the **Count** tab, with no login. Every kitchen item is listed under its category heading, in shelf order.
 - Each item has **Out / Low / Good** buttons and shows how long ago it was last updated ("just now", "15m ago", "2h ago", "3d ago").
 - A tap is saved to the database first. The highlight moves only when the save worked. If it didn't (bad wifi), the item says **"Didn't save, tap again"**.
+- The **Count** list reloads whenever it comes back into view: when the phone returns to the page (from another app, or after unlocking) and when you switch from Dashboard back to Count. Items being saved, or showing "Didn't save", are left as they are. If the reload fails, the list stays and a yellow bar says it couldn't be refreshed, with a **Try again** button.
 - The **Dashboard** tab lists everything that's **Out** (red), then **Low** (yellow), then **Good** (green), grouped by category. It loads fresh every time you open it, and **Refresh** reloads it.
 - Every phone sees the same statuses: the database is the one source of truth.
 

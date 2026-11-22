@@ -223,6 +223,46 @@ button:focus-visible {
   border-radius: 8px;
 }
 
+/* "Couldn't refresh the list" bar: pinned to the bottom of the screen,
+   so it's seen wherever the cook has scrolled to. Black on yellow
+   (a warning, not a failed save). */
+.refresh-notice {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2; /* above the sticky headings */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); /* clear the iPhone home bar */
+  font-weight: bold;
+  color: var(--low-text);
+  background: var(--low);
+  border-top: 3px solid var(--ink);
+}
+
+.refresh-notice p {
+  flex: 1;
+  margin: 0;
+}
+
+.retry-button {
+  flex-shrink: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+}
+
+/* While the bar shows, leave room under the list so it never covers the
+   last item's buttons. */
+body:has(.refresh-notice:not([hidden])) {
+  padding-bottom: 140px;
+}
+
 /* ---------- Dashboard tab ---------- */
 
 /* Full-width Refresh button. */
