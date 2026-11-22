@@ -158,6 +158,21 @@ button:focus-visible {
   line-height: 1;
 }
 
+/* "1 didn't save" in a category heading (issue #32): white on red, like
+   the "Didn't save, tap again" message itself, with a white edge so the
+   red stands out on the black band. Inline, so it wraps with the text
+   on narrow phones. */
+.toggle-flag {
+  padding: 1px 6px;
+  color: var(--out-text);
+  background: var(--out);
+  border: 2px solid var(--out-text);
+  border-radius: 6px;
+  white-space: nowrap; /* never split "1 didn't save" across lines */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 /* Focus ring in the band's own text color, drawn inside the band, so it
    shows on every color (blue wouldn't show on black). */
 .section-toggle:focus-visible {

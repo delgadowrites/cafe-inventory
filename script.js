@@ -239,17 +239,35 @@ function toggleSection(button) {
 // progress or a "Didn't save" tap never changes them; they always match
 // the highlighted buttons. Shown the same whether collapsed or not, so a
 // collapsed category can't hide a problem.
+//
+// Issue #32: it also flags rows showing "Didn't save, tap again", e.g.
+// "Dairy (6) · 1 Out · 1 didn't save", so a failed save can't hide in a
+// collapsed category. The flag is its own <span> (styled to stand out),
+// and it's part of the button's text, so screen readers read it too.
+// It's recounted whenever a "Didn't save" message appears or goes away
+// (see showSaveError) and on every reload.
 function updateCategorySummary(section) {
   const counts = { out: 0, low: 0, good: 0 };
+  let failed = 0;
   const rows = section.querySelectorAll("li.item");
   for (const li of rows) {
     const status = itemsById.get(li.dataset.id)?.status;
     if (status in counts) counts[status]++;
+    if (!li.querySelector(".save-error").hidden) failed++;
   }
   let text = `${section.dataset.category} (${rows.length})`;
   if (counts.out > 0) text += ` · ${counts.out} Out`; // · = middle dot
   if (counts.low > 0) text += ` · ${counts.low} Low`;
-  section.querySelector(".toggle-label").textContent = text;
+
+  const label = section.querySelector(".toggle-label");
+  label.textContent = text;
+  if (failed > 0) {
+    label.append(" · "); // stays plain, like the separators before it
+    const flag = document.createElement("span");
+    flag.className = "toggle-flag";
+    flag.textContent = `${failed} didn't save`;
+    label.appendChild(flag);
+  }
 }
 
 // Resets the Count tab to its defaults (all expanded). Used when
@@ -444,8 +462,13 @@ function setSaving(li, saving) {
 }
 
 // Shows or hides the "Didn't save, tap again" message on one item.
+// Also recounts the category heading's "didn't save" flag (issue #32),
+// so it appears and clears at the same moment as the message.
+// (No section if a reload removed this item meanwhile.)
 function showSaveError(li, show) {
   li.querySelector(".save-error").hidden = !show;
+  const section = li.closest(".category");
+  if (section) updateCategorySummary(section);
 }
 
 // ---------------------------------------------------------------------
