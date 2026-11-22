@@ -55,11 +55,10 @@ create table public.items (
 -- (including insert and delete). Remove anything automatic here, so app
 -- users get only what 01 (read) and 02 (update status) grant.
 --
--- One deliberate difference from the live project (checked Nov 22, 2026):
--- live, `anon` and `authenticated` also still hold TRUNCATE, REFERENCES
--- and TRIGGER on this table, left over from Supabase's automatic grants.
--- The app never uses them, and the Data API has no way to call them, so
--- the rebuilt project leaves them out on purpose.
+-- (The live project's `anon` and `authenticated` roles also held TRUNCATE,
+-- REFERENCES and TRIGGER, left over from Supabase's automatic grants.
+-- 04-revoke-extra-privileges.sql removes them there. Here they're never
+-- given, so a rebuilt project doesn't need 04.)
 revoke all on table public.items from anon, authenticated;
 
 -- ---------------------------------------------------------------------

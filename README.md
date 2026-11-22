@@ -67,6 +67,7 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 | `01-grant-read.sql` | Signed-in users can **read** `items` |
 | `02-update-status.sql` | Signed-in users can **update the `status` column only**, through an RLS update policy, plus a trigger that sets `updated_at` to the database time |
 | `03-keep-manual-updated-at.sql` | The trigger keeps an `updated_at` typed in by hand (for testing). App taps still get the database time. |
+| `04-revoke-extra-privileges.sql` | **Live project.** Removes TRUNCATE, REFERENCES and TRIGGER from app users (leftovers the app never used), so they can only read and change status. Not needed for a rebuild: `00` never grants them. |
 
 Row Level Security is on. There are no insert or delete permissions for app users: items are only added or removed in the Table Editor.
 
