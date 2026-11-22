@@ -39,8 +39,15 @@
     </section>
   </main>
 
-  <!-- Supabase library first (from the CDN), then your script, which uses it -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase library first (from the CDN), then your script, which uses it.
+       PINNED to one exact version (2.119.2, the one the app was tested with),
+       so a new supabase-js release can't change the app in the kitchen
+       without being tested first.
+       To update: change the version number below (see the list at
+       https://www.npmjs.com/package/@supabase/supabase-js?activeTab=versions),
+       then retest on a phone: items load, a tap saves, the Dashboard loads,
+       and a failed save (airplane mode) shows "Didn't save, tap again". -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
   <script src="script.js"></script>
 </body>
 

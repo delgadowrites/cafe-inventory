@@ -47,6 +47,7 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 ## How it's built
 
 - Plain HTML, CSS and JavaScript with no build step, hosted on **GitHub Pages** from the `main` branch.
+- **supabase-js** is loaded from the jsDelivr CDN, **pinned to version 2.119.2** in `index.html`, so the app only changes when we choose to update it. To update, change the version in the `<script>` tag, then retest on a phone (items load, a tap saves, the Dashboard loads, airplane mode shows "Didn't save, tap again").
 - **Supabase** (Postgres) stores the `items` table. The page signs in **anonymously** in the background, only when the browser has no saved session, so each phone is one anonymous user.
 - Only the **publishable** key is in the front-end code. What a visitor can do is limited by the database permissions below. Never put a secret key (`sb_secret_...`) in this repo.
 
