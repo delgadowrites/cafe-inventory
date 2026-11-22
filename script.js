@@ -134,16 +134,22 @@ function renderList(items, loadStartedAt) {
 
   // Build the new list off-screen first, then swap it in all at once.
   const sections = [];
+  let index = 0;
   for (const [category, categoryItems] of groupByCategory(items)) {
-    // One <section> per category: a heading, then its items.
+    // One <section> per category: a heading button, then its items.
+    // The section remembers its category name, so a tap on the heading
+    // knows which category to collapse (issue #26).
     const section = document.createElement("section");
     section.className = "category";
-
-    const heading = document.createElement("h2");
-    heading.textContent = category;
-    section.appendChild(heading);
+    section.dataset.category = category;
 
     const ul = document.createElement("ul");
+    ul.id = `category-items-${index++}`;
+    // Collapsed if this category was collapsed before the reload (the
+    // Set is empty on a page load or after switching back to Count).
+    const expanded = !collapsedCategories.has(category);
+    section.appendChild(renderSectionHeading(ul.id, expanded));
+
     for (const item of categoryItems) {
       const id = String(item.id);
       let li = oldRows.get(id);
@@ -155,7 +161,9 @@ function renderList(items, loadStartedAt) {
       }
       ul.appendChild(li);
     }
+    ul.hidden = !expanded;
     section.appendChild(ul);
+    updateCategorySummary(section); // "Dairy (6) · 1 Out · 2 Low"
     sections.push(section);
   }
 
@@ -163,6 +171,94 @@ function renderList(items, loadStartedAt) {
   // reload doesn't throw the cook back to the top of the shelf.
   listEl.replaceChildren(...sections);
   window.scrollTo(0, scrollY);
+}
+
+// ---------------------------------------------------------------------
+// 5b. Collapsible headings (issue #26)
+// ---------------------------------------------------------------------
+// Category headings on Count, and status headings on the Dashboard, are
+// buttons: a tap collapses or expands what's under them.
+//
+// What's collapsed lives only in the page (never saved on the phone):
+//   * page reload or new visit         -> defaults
+//   * switching tabs (Count <-> Dash)  -> the tab being opened resets
+//   * leaving the app and coming back  -> kept (the reloads read it)
+// Defaults: Count all expanded; Dashboard Out and Low open, Good closed.
+
+// Names of the collapsed Count categories. Empty = all expanded.
+const collapsedCategories = new Set();
+
+// Builds a heading: <h2><button aria-expanded aria-controls>
+//   <span class="toggle-label">…</span><span class="toggle-arrow">▾</span>
+// </button></h2>. The label text is filled in by the caller.
+// aria-expanded tells screen readers whether it's open; the arrow is
+// only for sight (▾ open, ▸ closed), so screen readers skip it.
+function renderSectionHeading(controlsId, expanded) {
+  const heading = document.createElement("h2");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "section-toggle";
+  button.setAttribute("aria-controls", controlsId);
+
+  const label = document.createElement("span");
+  label.className = "toggle-label";
+  const arrow = document.createElement("span");
+  arrow.className = "toggle-arrow";
+  arrow.setAttribute("aria-hidden", "true");
+
+  button.append(label, arrow);
+  heading.appendChild(button);
+  setHeadingExpanded(button, expanded);
+  return heading;
+}
+
+// Shows a heading as open or closed, and shows or hides what it controls.
+function setHeadingExpanded(button, expanded) {
+  button.setAttribute("aria-expanded", String(expanded));
+  button.querySelector(".toggle-arrow").textContent = expanded ? "▾" : "▸"; // ▾ / ▸
+  const body = document.getElementById(button.getAttribute("aria-controls"));
+  if (body) body.hidden = !expanded;
+}
+
+// Collapses or expands one section after its heading was tapped.
+// If the heading was stuck to the top of the screen (you'd scrolled
+// into that section), collapsing would leave you further down the page,
+// past it. So in that case, scroll back to the heading itself.
+function toggleSection(button) {
+  const section = button.closest("section");
+  const wasStuck = section.getBoundingClientRect().top < 0;
+  const expanded = button.getAttribute("aria-expanded") !== "true";
+  setHeadingExpanded(button, expanded);
+  if (!expanded && wasStuck) section.scrollIntoView({ block: "start" });
+  return expanded;
+}
+
+// Sets a Count heading's text from the items in its section:
+// "Dairy (6)", plus " · 1 Out" and " · 2 Low" only when there are any.
+// Counts use each item's SAVED status (itemsById), so a save in
+// progress or a "Didn't save" tap never changes them; they always match
+// the highlighted buttons. Shown the same whether collapsed or not, so a
+// collapsed category can't hide a problem.
+function updateCategorySummary(section) {
+  const counts = { out: 0, low: 0, good: 0 };
+  const rows = section.querySelectorAll("li.item");
+  for (const li of rows) {
+    const status = itemsById.get(li.dataset.id)?.status;
+    if (status in counts) counts[status]++;
+  }
+  let text = `${section.dataset.category} (${rows.length})`;
+  if (counts.out > 0) text += ` · ${counts.out} Out`; // · = middle dot
+  if (counts.low > 0) text += ` · ${counts.low} Low`;
+  section.querySelector(".toggle-label").textContent = text;
+}
+
+// Resets the Count tab to its defaults (all expanded). Used when
+// switching to Count from the Dashboard.
+function resetCountSections() {
+  collapsedCategories.clear();
+  for (const button of listEl.querySelectorAll(".section-toggle")) {
+    setHeadingExpanded(button, true);
+  }
 }
 
 // Refreshes one existing row with the status, time and name from a
@@ -253,6 +349,19 @@ function showStatus(li, status) {
 // One click listener on the whole list (instead of one per button).
 // It finds which button and which item row the tap landed on.
 listEl.addEventListener("click", (event) => {
+  // A category heading: collapse or expand it, and remember that until
+  // the next reset (see 5b).
+  const toggle = event.target.closest(".section-toggle");
+  if (toggle) {
+    const category = toggle.closest("section").dataset.category;
+    if (toggleSection(toggle)) {
+      collapsedCategories.delete(category);
+    } else {
+      collapsedCategories.add(category);
+    }
+    return;
+  }
+
   const button = event.target.closest(".status-button");
   if (!button) return; // the tap wasn't on a status button
 
@@ -308,6 +417,10 @@ async function saveStatus(li, id, status) {
     showStatus(li, data.status);
     // Show the new saved time ("just now") from the database's answer.
     setUpdated(li.querySelector(".updated"), data.updated_at);
+    // Update the category heading's Out / Low counts (issue #26).
+    // (No section if a reload removed this item meanwhile.)
+    const section = li.closest(".category");
+    if (section) updateCategorySummary(section);
   } catch (err) {
     // Offline, timed out, or refused. Nothing else changes: the old
     // status stays highlighted and the old time stays. The message tells
@@ -445,16 +558,26 @@ function readLastTab() {
 // Coming back to Count from the Dashboard reloads the Count list, so it
 // shows what other phones saved meanwhile (issue #18). Tapping Count
 // while already on Count does nothing.
+// Switching to Count also resets it to its defaults: every category
+// expanded (issue #26).
 countTab.addEventListener("click", () => {
   const fromDashboard = !dashboardView.hidden;
   showTab("count");
-  if (fromDashboard) loadCount();
+  if (fromDashboard) {
+    resetCountSections();
+    loadCount();
+  }
 });
 
 // Opening the Dashboard always loads fresh data from the database,
 // so it shows what every phone (and the Table Editor) has saved.
+// Switching to it from Count also resets it to its defaults: Out and
+// Low open, Good closed (issue #26). Tapping Dashboard while already on
+// it reloads, but keeps the open/closed sections.
 dashboardTab.addEventListener("click", () => {
+  const fromCount = dashboardView.hidden;
   showTab("dashboard");
+  if (fromCount) resetDashboardSections();
   loadDashboard();
 });
 
@@ -536,12 +659,38 @@ async function loadDashboard({ quiet = false } = {}) {
   }
 }
 
+// Which Dashboard sections are open (issue #26). Default: Out and Low
+// open, Good closed, so the shopping list isn't buried under Good items.
+// Kept across Refresh and coming back to the page; reset when switching
+// to the Dashboard from Count (see 5b for the rules).
+const DEFAULT_OPEN_SECTIONS = ["out", "low"];
+const openDashboardSections = new Set(DEFAULT_OPEN_SECTIONS);
+
+function resetDashboardSections() {
+  openDashboardSections.clear();
+  for (const value of DEFAULT_OPEN_SECTIONS) openDashboardSections.add(value);
+}
+
+// Tapping a status heading opens or closes that section.
+dashboardListEl.addEventListener("click", (event) => {
+  const toggle = event.target.closest(".section-toggle");
+  if (!toggle) return;
+  const status = toggle.closest("section").dataset.status;
+  if (toggleSection(toggle)) {
+    openDashboardSections.add(status);
+  } else {
+    openDashboardSections.delete(status);
+  }
+});
+
 // Draws Out, then Low, then Good. Inside each status, items are grouped
 // by category in shelf order (loadItems already sorted them by
 // sort_order, and filtering keeps that order).
-//   <section class="status-section status-out">
-//     <h2>Out (3)</h2>
-//     <h3>Dairy</h3> <ul><li>Milk <span class="updated">2h ago</span></li>...</ul>
+//   <section class="status-section status-out" data-status="out">
+//     <h2><button aria-expanded="true">Out (3) ▾</button></h2>
+//     <div class="status-body">
+//       <h3>Dairy</h3> <ul><li>Milk <span class="updated">2h ago</span></li>...</ul>
+//     </div>
 function renderDashboard(items) {
   // Keep the scroll position across a reload (the list is rebuilt).
   const scrollY = window.scrollY;
@@ -553,22 +702,32 @@ function renderDashboard(items) {
     const section = document.createElement("section");
     // status-out / status-low / status-good set the red/yellow/green color.
     section.className = `status-section status-${status.value}`;
+    section.dataset.status = status.value;
 
-    const heading = document.createElement("h2");
-    heading.textContent = `${status.label} (${statusItems.length})`;
+    // Everything under the heading goes in one box, which the heading
+    // shows or hides.
+    const body = document.createElement("div");
+    body.className = "status-body";
+    body.id = `dashboard-section-${status.value}`;
+    const expanded = openDashboardSections.has(status.value);
+    body.hidden = !expanded;
+
+    const heading = renderSectionHeading(body.id, expanded);
+    heading.querySelector(".toggle-label").textContent = `${status.label} (${statusItems.length})`;
     section.appendChild(heading);
+    section.appendChild(body);
 
     if (statusItems.length === 0) {
       const none = document.createElement("p");
       none.className = "none";
       none.textContent = "None";
-      section.appendChild(none);
+      body.appendChild(none);
     }
 
     for (const [category, categoryItems] of groupByCategory(statusItems)) {
       const categoryHeading = document.createElement("h3");
       categoryHeading.textContent = category;
-      section.appendChild(categoryHeading);
+      body.appendChild(categoryHeading);
 
       const ul = document.createElement("ul");
       for (const item of categoryItems) {
@@ -581,7 +740,7 @@ function renderDashboard(items) {
         li.appendChild(renderUpdated(item.updated_at));
         ul.appendChild(li);
       }
-      section.appendChild(ul);
+      body.appendChild(ul);
     }
 
     dashboardListEl.appendChild(section);

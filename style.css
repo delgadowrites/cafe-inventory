@@ -121,9 +121,48 @@ button:focus-visible {
   z-index: 1;
   font-size: 1.2rem;
   margin: 20px 0 0;
-  padding: 10px 12px;
+  padding: 0; /* the button inside sets the padding (issue #26) */
   color: var(--paper);
   background: var(--ink);
+}
+
+/* ---------- Collapsible headings (both tabs, issue #26) ---------- */
+
+/* The whole heading band is one button: label on the left, arrow
+   (▾ open / ▸ closed) on the right. It takes the band's colors, so it
+   looks the same as before, and it's at least 48px tall to tap. */
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 12px;
+  font: inherit;          /* the heading's size, bold */
+  text-align: left;
+  color: inherit;         /* white on black, white on red, black on yellow... */
+  background: transparent;
+  border: 0;
+}
+
+.toggle-label {
+  flex: 1;
+}
+
+/* The ▸ / ▾ characters are drawn small in most fonts, so make them big
+   enough to read at arm's length. */
+.toggle-arrow {
+  flex-shrink: 0;
+  font-size: 1.6em;
+  line-height: 1;
+}
+
+/* Focus ring in the band's own text color, drawn inside the band, so it
+   shows on every color (blue wouldn't show on black). */
+.section-toggle:focus-visible {
+  outline: 4px solid currentColor;
+  outline-offset: -6px;
 }
 
 /* Remove the default bullets and indentation from item lists. */
@@ -302,7 +341,7 @@ body:has(.refresh-notice:not([hidden])) {
   z-index: 1;
   font-size: 1.35rem;
   margin: 0;
-  padding: 10px 12px;
+  padding: 0; /* the button inside sets the padding (issue #26) */
 }
 
 /* Same colors as the Count buttons. */
