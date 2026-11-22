@@ -35,6 +35,11 @@ const STATUSES = [
 // (see saveStatus below).
 const itemsById = new Map();
 
+// When each item's last save was confirmed (performance.now() time), by
+// id. A Count reload that STARTED before that moment may carry the old
+// status, so it leaves that item alone (see updateRow below).
+const lastSaveFinished = new Map();
+
 // ---------------------------------------------------------------------
 // 2. Make sure we're signed in (anonymously)
 // ---------------------------------------------------------------------
@@ -62,12 +67,18 @@ async function ensureSignedIn() {
 // ---------------------------------------------------------------------
 // sort_order is the shelf order. If two rows share a sort_order, id
 // breaks the tie so the order is always the same on every phone.
+// Like saves, loads give up after a while, so a hanging connection ends
+// in a clear "couldn't load / couldn't refresh" message instead of
+// waiting forever.
+const LOAD_TIMEOUT_MS = 15 * 1000;
+
 async function loadItems() {
   const { data, error } = await db
     .from("items")
     .select("id, name, category, sort_order, status, updated_at")
     .order("sort_order", { ascending: true })
-    .order("id", { ascending: true });
+    .order("id", { ascending: true })
+    .abortSignal(AbortSignal.timeout(LOAD_TIMEOUT_MS));
 
   if (error) throw error;
   return data;
@@ -95,14 +106,34 @@ function groupByCategory(items) {
 // ---------------------------------------------------------------------
 // We build elements with createElement + textContent (not innerHTML),
 // so an item name can never be treated as HTML.
-function renderList(items) {
-  listEl.replaceChildren(); // clear "Loading..." or an old list
+//
+// This draws the first load AND every reload (issue #18). On a reload,
+// an item that's already on screen keeps its existing row (the same
+// <li>, moved into place), so a save that's in progress or a
+// "Didn't save, tap again" message on it survives the reload.
+// New items get a new row; removed items disappear; renamed or moved
+// items (Table Editor) show their new name and place.
+//
+// `loadStartedAt` is when this load's request was sent (performance.now()).
+function renderList(items, loadStartedAt) {
+  // Note the scroll position FIRST: moving existing rows into the new
+  // list (below) takes them off the page, which shrinks it and makes the
+  // browser scroll up before the new list is swapped in.
+  const scrollY = window.scrollY;
+
+  // The rows on screen now, by id (empty on the first load).
+  const oldRows = new Map();
+  for (const li of listEl.querySelectorAll("li.item")) {
+    oldRows.set(li.dataset.id, li);
+  }
 
   if (items.length === 0) {
     showMessage(listEl, "No items found.");
     return;
   }
 
+  // Build the new list off-screen first, then swap it in all at once.
+  const sections = [];
   for (const [category, categoryItems] of groupByCategory(items)) {
     // One <section> per category: a heading, then its items.
     const section = document.createElement("section");
@@ -114,13 +145,44 @@ function renderList(items) {
 
     const ul = document.createElement("ul");
     for (const item of categoryItems) {
-      itemsById.set(String(item.id), item); // remember the saved version
-      ul.appendChild(renderItem(item));
+      const id = String(item.id);
+      let li = oldRows.get(id);
+      if (li) {
+        updateRow(li, item, loadStartedAt); // already on screen: refresh it
+      } else {
+        itemsById.set(id, item); // remember the saved version
+        li = renderItem(item);
+      }
+      ul.appendChild(li);
     }
     section.appendChild(ul);
-
-    listEl.appendChild(section);
+    sections.push(section);
   }
+
+  // Swap in the new list, and put the scroll back where it was, so a
+  // reload doesn't throw the cook back to the top of the shelf.
+  listEl.replaceChildren(...sections);
+  window.scrollTo(0, scrollY);
+}
+
+// Refreshes one existing row with the status, time and name from a
+// reload, unless that would undo something on screen:
+//   * a save is in progress on it (its buttons are off), or
+//   * it shows "Didn't save, tap again" (the cook still needs to see that), or
+//   * a save on it was confirmed AFTER this reload was sent, so the
+//     reload may carry the status from before that save.
+// In those cases the row is left exactly as it is.
+function updateRow(li, item, loadStartedAt) {
+  const id = li.dataset.id;
+  const saving = li.getAttribute("aria-busy") === "true";
+  const errorShowing = !li.querySelector(".save-error").hidden;
+  const savedSinceLoadStarted = (lastSaveFinished.get(id) ?? -Infinity) > loadStartedAt;
+  if (saving || errorShowing || savedSinceLoadStarted) return;
+
+  itemsById.set(id, item);
+  li.querySelector(".item-name").textContent = item.name;
+  showStatus(li, item.status);
+  setUpdated(li.querySelector(".updated"), item.updated_at);
 }
 
 // Builds one item row: the name and last-updated time, then the
@@ -228,7 +290,11 @@ async function saveStatus(li, id, status) {
 
     if (error) throw error;
 
-    // Saved. Clear any earlier "Didn't save" message on this item.
+    // Saved. Note when, so a Count reload sent before now won't put
+    // the old status back (see updateRow).
+    lastSaveFinished.set(id, performance.now());
+
+    // Clear any earlier "Didn't save" message on this item.
     showSaveError(li, false);
 
     // Only show this result if it's at least as new as what's already
@@ -344,7 +410,14 @@ function showTab(name) {
   dashboardView.hidden = !isDashboard;
 }
 
-countTab.addEventListener("click", () => showTab("count"));
+// Coming back to Count from the Dashboard reloads the Count list, so it
+// shows what other phones saved meanwhile (issue #18). Tapping Count
+// while already on Count does nothing.
+countTab.addEventListener("click", () => {
+  const fromDashboard = !dashboardView.hidden;
+  showTab("count");
+  if (fromDashboard) loadCount();
+});
 
 // Opening the Dashboard always loads fresh data from the database,
 // so it shows what every phone (and the Table Editor) has saved.
@@ -458,17 +531,63 @@ function renderDashboard(items) {
 // visit could create two anonymous users.)
 const signedIn = ensureSignedIn();
 
-async function start() {
-  showMessage(listEl, "Loading...");
+// ---------------------------------------------------------------------
+// 10. Load (and reload) the Count list
+// ---------------------------------------------------------------------
+// Phones keep tabs open for hours or days, so the Count list is loaded
+// when the page opens AND again whenever it comes back into view
+// (issue #18). This is not live updating: it's one fresh load at the
+// moments staff look at the list.
+
+// The "Couldn't refresh the list" bar and its Try again button.
+const countNoticeEl = document.getElementById("count-notice");
+document.getElementById("count-retry").addEventListener("click", loadCount);
+
+// Counts Count loads. If several start close together (quick tab
+// switches), only the newest one is allowed to draw.
+let countLoadNumber = 0;
+
+async function loadCount() {
+  const thisLoad = ++countLoadNumber;
+  const loadStartedAt = performance.now();
+
+  // Is a list already on screen? (No on the first load, or after the
+  // first load failed.) Only then is this a quiet "refresh".
+  const hasList = listEl.querySelector("li.item") !== null;
+  if (!hasList) showMessage(listEl, "Loading...");
+
   try {
     await signedIn;
     const items = await loadItems();
-    renderList(items);
+    if (thisLoad !== countLoadNumber) return; // a newer load is coming
+    renderList(items, loadStartedAt);
+    countNoticeEl.hidden = true; // the list is fresh again
   } catch (err) {
     // Log the details for debugging, and tell the user in plain words.
     console.error("Could not load the item list:", err);
-    showMessage(listEl, "Couldn't load the item list. Check the connection and refresh.");
+    if (thisLoad !== countLoadNumber) return;
+    if (hasList) {
+      // Keep the list that's on screen (statuses may be old), and say so.
+      countNoticeEl.hidden = false;
+    } else {
+      showMessage(listEl, "Couldn't load the item list. Check the connection and refresh.");
+    }
   }
 }
 
-start();
+// Reload when the phone comes back to this page (from another app or
+// tab, or after unlocking), if the Count tab is the one showing.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && !countView.hidden) {
+    loadCount();
+  }
+});
+
+// Some phones (Safari especially) restore a page from memory when you
+// go Back to it, without reloading it. Treat that as coming back too.
+// (If visibilitychange also fires, the load counter keeps only one.)
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && !countView.hidden) loadCount();
+});
+
+loadCount();

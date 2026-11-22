@@ -29,6 +29,13 @@
          JavaScript fills #item-list with a heading and items per category. -->
     <section id="count-view" role="tabpanel" aria-labelledby="tab-count">
       <div id="item-list"></div>
+      <!-- Shown at the bottom of the screen when a reload of the list
+           fails (e.g. offline). The list on screen stays; this says it
+           may be out of date. role="status" makes screen readers read it. -->
+      <div id="count-notice" class="refresh-notice" role="status" hidden>
+        <p>Couldn't refresh the list. Statuses may be out of date.</p>
+        <button type="button" id="count-retry" class="retry-button">Try again</button>
+      </div>
     </section>
 
     <!-- Dashboard tab (the GM's shopping list): Out, then Low, then Good.
