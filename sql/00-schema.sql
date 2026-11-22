@@ -21,7 +21,8 @@
 --   2. Takes away any automatic permissions on the new table, so that
 --      01 and 02 give exactly the access the live project has.
 --   3. Turns on Row Level Security and adds the read policy.
---   4. Inserts the 46 items (copied from the live table on Nov 22, 2026).
+--   4. Inserts the 46 items (copied from the live table on Nov 22, 2026,
+--      with "Produce (Fresh)" renamed to "Produce", issue #30).
 
 begin;
 
@@ -33,7 +34,7 @@ create table public.items (
   id         uuid        primary key default gen_random_uuid(),
   -- What's on the shelf, e.g. 'Potatoes (Box)'.
   name       text        not null,
-  -- The heading it's listed under, e.g. 'Produce (Fresh)'. Items with the
+  -- The heading it's listed under, e.g. 'Produce'. Items with the
   -- same category are grouped together; spell it exactly the same.
   category   text        not null,
   -- Shelf order, in steps of 10 (so a new item can go in between, e.g. 45).
@@ -80,17 +81,19 @@ create policy "Signed-in users can read items"
 -- ---------------------------------------------------------------------
 -- 4. The 46 items, in shelf order
 -- ---------------------------------------------------------------------
--- Copied from the live table. Only name, category and sort_order are
+-- Copied from the live table, except that the produce category is
+-- called 'Produce' here (it was 'Produce (Fresh)', issue #30; rename it
+-- in the live table too so the two match). Only name, category and sort_order are
 -- given: id is generated, every item starts as 'good', and updated_at is
 -- the time this runs. The first full walk sets the real statuses.
 insert into public.items (name, category, sort_order) values
-  -- Produce (Fresh)
-  ('Arugula',              'Produce (Fresh)',      10),
-  ('Cherry Tomatoes',      'Produce (Fresh)',      20),
-  ('Green Chile',          'Produce (Fresh)',      30),
-  ('Potatoes (Box)',       'Produce (Fresh)',      40),
-  ('Blueberries',          'Produce (Fresh)',      45),
-  ('Strawberries',         'Produce (Fresh)',      50),
+  -- Produce
+  ('Arugula',              'Produce',              10),
+  ('Cherry Tomatoes',      'Produce',              20),
+  ('Green Chile',          'Produce',              30),
+  ('Potatoes (Box)',       'Produce',              40),
+  ('Blueberries',          'Produce',              45),
+  ('Strawberries',         'Produce',              50),
   -- Dairy
   ('Whipped Cream Cheese', 'Dairy',                60),
   ('Eggs',                 'Dairy',                70),
