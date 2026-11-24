@@ -62,6 +62,51 @@ async function ensureSignedIn() {
   return result.data.session;
 }
 
+// Sign-in that can be tried again (issue #34).
+// Every load waits on getSignedIn(). It:
+//   * reuses a sign-in that worked (no new user), or one that's still
+//     running (so two loads at once share ONE sign-in: two
+//     signInAnonymously() calls at once would create two users);
+//   * starts a NEW sign-in only if the last one failed, so a weak
+//     connection at the first visit can recover without a page refresh.
+// Each wait gives up after SIGN_IN_TIMEOUT_MS, so the screen never sits
+// on "Loading..." forever. Giving up doesn't cancel the request itself:
+// it keeps running, and the next try waits for that same request instead
+// of starting a second one. If its reply arrives late, supabase-js saves
+// the session and the next try simply reuses it (no extra user).
+const SIGN_IN_TIMEOUT_MS = 10 * 1000;
+
+let signInRequest = null; // the sign-in running now, or the last one
+let signInFailed = false; // true once that sign-in has failed
+
+function getSignedIn() {
+  if (signInRequest === null || signInFailed) {
+    const request = ensureSignedIn();
+    signInRequest = request;
+    signInFailed = false;
+    // Note when THIS request fails (an older one failing late can't
+    // mark a newer one as failed).
+    request.catch(() => {
+      if (signInRequest === request) signInFailed = true;
+    });
+  }
+  return withTimeout(signInRequest, SIGN_IN_TIMEOUT_MS);
+}
+
+// Waits for `promise`, but fails with a "TimeoutError" after `ms`.
+// (The promise itself keeps going; we just stop waiting for it.)
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`Gave up waiting after ${ms / 1000}s`);
+      err.name = "TimeoutError";
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // ---------------------------------------------------------------------
 // 3. Load the items from the database
 // ---------------------------------------------------------------------
@@ -73,15 +118,136 @@ async function ensureSignedIn() {
 const LOAD_TIMEOUT_MS = 15 * 1000;
 
 async function loadItems() {
-  const { data, error } = await db
+  const { data, error, status } = await db
     .from("items")
     .select("id, name, category, sort_order, status, updated_at")
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true })
     .abortSignal(AbortSignal.timeout(LOAD_TIMEOUT_MS));
 
-  if (error) throw error;
+  if (error) {
+    // Keep the HTTP status (e.g. 401) with the error, for the
+    // "Details:" line (issue #34). It's 0 when there was no reply at all.
+    error.status = status;
+    throw error;
+  }
   return data;
+}
+
+// ---------------------------------------------------------------------
+// 3b. Sign in, load, and retry on a first load (issue #34)
+// ---------------------------------------------------------------------
+// Both tabs load the same way: sign in (if needed), then load the items.
+// If it fails, the error remembers WHICH step failed ("sign-in" or
+// "list"), so the error on screen can say so.
+async function signInAndLoadItems() {
+  try {
+    await getSignedIn();
+  } catch (err) {
+    throw loadFailure("sign-in", err);
+  }
+  try {
+    return await loadItems();
+  } catch (err) {
+    throw loadFailure("list", err);
+  }
+}
+
+function loadFailure(step, cause) {
+  const err = new Error(`Load failed at ${step}`, { cause });
+  err.step = step;
+  return err;
+}
+
+// On a FIRST load (no list on screen yet), a failed load is tried again
+// automatically, after about 2s and then about 5s: a weak kitchen signal
+// often works a moment later. Reloads with a list on screen don't retry
+// (they keep the list and show the "Couldn't refresh" bar instead).
+const FIRST_LOAD_RETRY_DELAYS_MS = [2 * 1000, 5 * 1000];
+
+// Runs signInAndLoadItems(), retrying `retryDelays` times.
+//   onRetry():   called before each retry (to show "Still connecting...")
+//   isCurrent(): false once a newer load has started; then this one
+//                stops retrying (the newer load takes over).
+// Each failed try is logged. Returns the items, or throws the last error.
+async function loadItemsWithRetries(retryDelays, onRetry, isCurrent) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await signInAndLoadItems();
+    } catch (err) {
+      console.error(`Load try ${attempt + 1} failed:`, err);
+      if (attempt >= retryDelays.length || !isCurrent()) throw err;
+      onRetry();
+      await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+      if (!isCurrent()) throw err;
+    }
+  }
+}
+
+// The short "Details: <step> · <reason>" line under a load error, so a
+// screenshot of the error tells us why it failed. It only ever contains
+// the step and a short reason (never keys, tokens or user ids):
+//   step:   "sign-in" or "list"
+//   reason: "timed out", "no connection", an HTTP status like "401",
+//           or the error's code or name.
+function loadErrorDetails(err) {
+  const step = err.step ?? "list";
+  return `Details: ${step} · ${loadErrorReason(err.cause ?? err)}`; // · = middle dot
+}
+
+function loadErrorReason(err) {
+  if (!err) return "unknown";
+  const name = String(err.name ?? "");
+  // The database library turns a failed request into an error whose
+  // message starts with the original error's name, e.g.
+  // "TimeoutError: signal timed out" or "TypeError: Load failed".
+  const message = String(err.message ?? "");
+
+  if (/^(TimeoutError|AbortError)$/.test(name) || /^(TimeoutError|AbortError)\b/.test(message)) {
+    return "timed out";
+  }
+  // No reply at all: offline, airplane mode, connection dropped.
+  // (Safari says "Load failed", Chrome "Failed to fetch", Firefox
+  // "NetworkError...". Sign-in reports it as AuthRetryableFetchError.)
+  if (
+    name === "TypeError" ||
+    name === "AuthRetryableFetchError" ||
+    /^TypeError\b|load failed|failed to fetch|networkerror/i.test(message)
+  ) {
+    return "no connection";
+  }
+  if (typeof err.status === "number" && err.status > 0) return String(err.status);
+  // Codes and names are short words like "PGRST301"; anything else
+  // (spaces, long text) is left out, so nothing private can show.
+  for (const value of [err.code, name]) {
+    if (typeof value === "string" && /^[\w-]{1,40}$/.test(value)) return value;
+  }
+  return "unknown";
+}
+
+// Shows a first-load error in place of a list: the message, the
+// "Details:" line, and a Try again button that runs `retry` (the same
+// steps again, with no page refresh).
+function showLoadError(container, text, err, retry) {
+  const box = document.createElement("div");
+  box.className = "load-error";
+
+  const p = document.createElement("p");
+  p.className = "message";
+  p.textContent = text;
+
+  const details = document.createElement("p");
+  details.className = "load-details";
+  details.textContent = loadErrorDetails(err);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "retry-button";
+  button.textContent = "Try again";
+  button.addEventListener("click", retry);
+
+  box.append(p, details, button);
+  container.replaceChildren(box);
 }
 
 // ---------------------------------------------------------------------
@@ -625,6 +791,8 @@ let dashboardLoadNumber = 0;
 // The "Couldn't refresh the list" bar for the Dashboard and its
 // Try again button (same look as the Count tab's, issue #24).
 const dashboardNoticeEl = document.getElementById("dashboard-notice");
+// The bar's "Details:" line (issue #34).
+const dashboardNoticeDetailsEl = dashboardNoticeEl.querySelector(".load-details");
 document.getElementById("dashboard-retry").addEventListener("click", () => {
   loadDashboard({ quiet: true });
 });
@@ -655,9 +823,18 @@ async function loadDashboard({ quiet = false } = {}) {
     showMessage(dashboardListEl, "Loading...");
   }
 
+  // Issue #34: when no list is on screen yet, a failed load is retried
+  // automatically (see 3b), showing "Still connecting..." meanwhile.
+  // With a list on screen (a normal Refresh, or a quiet reload), the
+  // list is already there to look at, so no automatic retries.
+  const retryDelays = hasList ? [] : FIRST_LOAD_RETRY_DELAYS_MS;
+
   try {
-    await signedIn;
-    const items = await loadItems();
+    const items = await loadItemsWithRetries(
+      retryDelays,
+      () => showMessage(dashboardListEl, "Still connecting..."),
+      () => thisLoad === dashboardLoadNumber,
+    );
     if (thisLoad === dashboardLoadNumber) {
       renderDashboard(items);
       dashboardNoticeEl.hidden = true; // the list is fresh again
@@ -666,11 +843,20 @@ async function loadDashboard({ quiet = false } = {}) {
     console.error("Could not load the dashboard:", err);
     if (thisLoad === dashboardLoadNumber) {
       if (keepList) {
-        // Keep the list that's on screen (it may be old), and say so.
+        // Keep the list that's on screen (it may be old), and say so,
+        // with the short reason (issue #34).
+        dashboardNoticeDetailsEl.textContent = loadErrorDetails(err);
         dashboardNoticeEl.hidden = false;
       } else {
         dashboardNoticeEl.hidden = true; // the message below says it all
-        showMessage(dashboardListEl, "Couldn't load the dashboard. Check the connection and tap Refresh.");
+        // The error, its "Details:" line, and a Try again button that
+        // runs this same load again (issue #34).
+        showLoadError(
+          dashboardListEl,
+          "Couldn't load the dashboard. Check the connection and tap Try again.",
+          err,
+          () => loadDashboard(),
+        );
       }
     }
   } finally {
@@ -777,10 +963,9 @@ function renderDashboard(items) {
 // ---------------------------------------------------------------------
 // 9. Start the app
 // ---------------------------------------------------------------------
-// Sign in once, and keep the promise so both tabs can wait on the same
-// sign-in. (Calling ensureSignedIn() twice at the same moment on a first
-// visit could create two anonymous users.)
-const signedIn = ensureSignedIn();
+// Sign-in starts with the first load: both tabs call getSignedIn()
+// (section 2), which shares one sign-in between them and starts a new
+// one only if the last one failed (issue #34).
 
 // ---------------------------------------------------------------------
 // 10. Load (and reload) the Count list
@@ -792,7 +977,9 @@ const signedIn = ensureSignedIn();
 
 // The "Couldn't refresh the list" bar and its Try again button.
 const countNoticeEl = document.getElementById("count-notice");
-document.getElementById("count-retry").addEventListener("click", loadCount);
+// The bar's "Details:" line (issue #34).
+const countNoticeDetailsEl = countNoticeEl.querySelector(".load-details");
+document.getElementById("count-retry").addEventListener("click", () => loadCount());
 
 // Counts Count loads. If several start close together (quick tab
 // switches), only the newest one is allowed to draw.
@@ -807,9 +994,16 @@ async function loadCount() {
   const hasList = listEl.querySelector("li.item") !== null;
   if (!hasList) showMessage(listEl, "Loading...");
 
+  // Issue #34: with no list on screen yet, a failed load is retried
+  // automatically (see 3b), showing "Still connecting..." meanwhile.
+  const retryDelays = hasList ? [] : FIRST_LOAD_RETRY_DELAYS_MS;
+
   try {
-    await signedIn;
-    const items = await loadItems();
+    const items = await loadItemsWithRetries(
+      retryDelays,
+      () => showMessage(listEl, "Still connecting..."),
+      () => thisLoad === countLoadNumber,
+    );
     if (thisLoad !== countLoadNumber) return; // a newer load is coming
     renderList(items, loadStartedAt);
     countNoticeEl.hidden = true; // the list is fresh again
@@ -818,10 +1012,19 @@ async function loadCount() {
     console.error("Could not load the item list:", err);
     if (thisLoad !== countLoadNumber) return;
     if (hasList) {
-      // Keep the list that's on screen (statuses may be old), and say so.
+      // Keep the list that's on screen (statuses may be old), and say so,
+      // with the short reason (issue #34).
+      countNoticeDetailsEl.textContent = loadErrorDetails(err);
       countNoticeEl.hidden = false;
     } else {
-      showMessage(listEl, "Couldn't load the item list. Check the connection and refresh.");
+      // The error, its "Details:" line, and a Try again button that runs
+      // this same load again, with no page refresh (issue #34).
+      showLoadError(
+        listEl,
+        "Couldn't load the item list. Check the connection and tap Try again.",
+        err,
+        () => loadCount(),
+      );
     }
   }
 }

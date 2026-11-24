@@ -296,9 +296,36 @@ button:focus-visible {
   border-top: 3px solid var(--ink);
 }
 
-.refresh-notice p {
+.notice-text {
   flex: 1;
+}
+.refresh-notice p {
   margin: 0;
+}
+
+/* "Details: list · timed out" under a load error (issue #34): small and
+   not bold, so it reads as a footnote. --muted is ~12:1 on white and
+   ~10:1 on the yellow bar. Empty = takes no space. */
+.load-details {
+  font-size: 0.85rem;
+  font-weight: normal;
+  color: var(--muted);
+}
+.load-details:empty {
+  display: none;
+}
+
+/* A first-load error in place of a list (issue #34): message, details,
+   then a Try again button (same look as the bar's, full width so it's
+   easy to hit). */
+.load-error .message {
+  margin-bottom: 4px;
+}
+.load-error .load-details {
+  margin: 0 0 12px;
+}
+.load-error .retry-button {
+  width: 100%;
 }
 
 .retry-button {
@@ -313,8 +340,10 @@ button:focus-visible {
 
 /* While the bar shows, leave room under the list so it never covers the
    last item's buttons. */
+/* Room for the bar (now with its "Details:" line, issue #34) plus the
+   iPhone home bar, so the bar never covers the last item. */
 body:has(.refresh-notice:not([hidden])) {
-  padding-bottom: 140px;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom));
 }
 
 /* ---------- Dashboard tab ---------- */
