@@ -33,7 +33,13 @@
            fails (e.g. offline). The list on screen stays; this says it
            may be out of date. role="status" makes screen readers read it. -->
       <div id="count-notice" class="refresh-notice" role="status" hidden>
-        <p>Couldn't refresh the list. Statuses may be out of date.</p>
+        <!-- The message, and under it a short "Details: list · timed out"
+             line filled in by script.js, so a screenshot shows why
+             (issue #34). -->
+        <div class="notice-text">
+          <p>Couldn't refresh the list. Statuses may be out of date.</p>
+          <p class="load-details"></p>
+        </div>
         <button type="button" id="count-retry" class="retry-button">Try again</button>
       </div>
     </section>
@@ -46,7 +52,13 @@
       <!-- Same bar as the Count tab's: shown when a reload after coming
            back to the page fails. The list on screen stays. -->
       <div id="dashboard-notice" class="refresh-notice" role="status" hidden>
-        <p>Couldn't refresh the list. Statuses may be out of date.</p>
+        <!-- The message, and under it a short "Details: list · timed out"
+             line filled in by script.js, so a screenshot shows why
+             (issue #34). -->
+        <div class="notice-text">
+          <p>Couldn't refresh the list. Statuses may be out of date.</p>
+          <p class="load-details"></p>
+        </div>
         <button type="button" id="dashboard-retry" class="retry-button">Try again</button>
       </div>
     </section>
