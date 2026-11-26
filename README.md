@@ -71,6 +71,7 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 | `03-keep-manual-updated-at.sql` | The trigger keeps an `updated_at` typed in by hand (for testing). App taps still get the database time. |
 | `04-revoke-extra-privileges.sql` | **Live project.** Removes TRUNCATE, REFERENCES and TRIGGER from app users (leftovers the app never used), so they can only read and change status. Not needed for a rebuild: `00` never grants them. |
 | `05-add-area.sql` | Adds the `area` column: which list a row belongs to (`kitchen`, `foh` or `shared`). Existing rows get `kitchen`; after that there's no default, so every new row must name its area, and the database refuses any other value. App users can read `area` but not change it. **Live project:** run before merging the "Load one area from the link" change (#37). |
+| `06-foh-items.sql` | Adds the 44 front-of-house items (7 categories, `area = 'foh'`) and moves Salt and Black Pepper, plus a new Honey, to a **Shared** heading (`area = 'shared'`, `sort_order` 1000 / 1010 / 1020) that shows at the bottom of both lists with one status. Salt and Black Pepper keep their status; Black Pepper is added if it's missing. A second run stops with an error and changes nothing. **Live project:** run only after #37 is merged and live. |
 
 Row Level Security is on. There are no insert or delete permissions for app users: items are only added or removed in the Table Editor.
 
@@ -79,7 +80,7 @@ If the Supabase project is ever lost or paused for good, everything can be rebui
 
 1. Create a **new** Supabase project (free tier).
 2. Turn on anonymous sign-ins: **Authentication** → **Sign In / Providers** → **Allow anonymous sign-ins**.
-3. In the **SQL Editor**, run the files in `sql/` in order, one at a time: `00-schema.sql`, `01-grant-read.sql`, `02-update-status.sql`, `03-keep-manual-updated-at.sql`, `05-add-area.sql`. After `00`, its check queries should show 46 items in 10 categories.
+3. In the **SQL Editor**, run the files in `sql/` in order, one at a time: `00-schema.sql`, `01-grant-read.sql`, `02-update-status.sql`, `03-keep-manual-updated-at.sql`, `05-add-area.sql`, `06-foh-items.sql`. After `00`, its check queries should show 46 items in 10 categories. `05` and `06` run after `03` (`04` isn't needed): the project gets `00`'s 46 kitchen items, then `06` adds Black Pepper, Honey and the front-of-house items, so its check queries should show `kitchen` 45, `foh` 44, `shared` 3.
 4. Copy the new project's URL and **publishable** key (**Project Settings** → **API Keys**) into `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of `script.js`, then commit to `main`.
 5. Retest: items load, a tap saves, the Dashboard loads.
 
