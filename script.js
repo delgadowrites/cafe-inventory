@@ -1,8 +1,64 @@
 // =====================================================================
-// Cafe Kitchen Inventory - script.js
-// Loads every item from the Supabase `items` table and shows them
-// grouped under category headings, in shelf order (sort_order).
+// Cafe Inventory - script.js
+// One app, two lists (issue #37). The link decides which one:
+//   no ?area (or ?area=kitchen)  -> the kitchen list
+//   ?area=foh                    -> the front-of-house (barista) list
+// It loads that list's items from the Supabase `items` table (rows whose
+// `area` is this list, plus the `shared` rows that show in both) and
+// shows them grouped under category headings, in shelf order
+// (sort_order). An unknown ?area shows an "Unknown area" screen instead
+// and never signs in, loads or saves.
 // =====================================================================
+
+// ---------------------------------------------------------------------
+// 0. Which list this page shows (issue #37)
+// ---------------------------------------------------------------------
+// Everything that differs between the lists lives in this one table, so
+// adding a list later is one more entry here (plus its rows in the
+// database, with that `area`):
+//   heading:    the big heading at the top of the page
+//   title:      the browser tab's title
+//   lastTabKey: where this phone remembers the last tab for this list
+//               (section 7b). The kitchen's key is the one the app has
+//               always used, so kitchen phones keep their saved tab.
+const AREAS = {
+  kitchen: {
+    heading: "Kitchen Inventory",
+    title: "Cafe Inventory",
+    lastTabKey: "cafe-inventory:last-tab",
+  },
+  foh: {
+    heading: "Front of House Inventory",
+    title: "Front of House Inventory",
+    lastTabKey: "cafe-inventory:last-tab:foh",
+  },
+};
+
+// Reads ?area= from the link. Spaces around it and capitals don't matter
+// (?area=FOH works). Missing or empty means the kitchen, so the kitchen
+// QR code (no ?area) keeps working. Returns the area's name, or null for
+// anything that isn't in AREAS (a typo like ?area=bar).
+function readArea() {
+  const value = (new URLSearchParams(location.search).get("area") ?? "")
+    .trim()
+    .toLowerCase();
+  if (value === "") return "kitchen";
+  return Object.keys(AREAS).includes(value) ? value : null;
+}
+
+// AREA is "kitchen", "foh", or null (unknown). It's read once, here,
+// before anything signs in or loads.
+const AREA = readArea();
+const areaSettings = AREA === null ? null : AREAS[AREA];
+
+// Set the heading and tab title now, before the list loads, so a
+// front-of-house phone never shows "Kitchen Inventory".
+if (areaSettings) {
+  document.querySelector("h1").textContent = areaSettings.heading;
+  document.title = areaSettings.title;
+} else {
+  document.querySelector("h1").textContent = "Unknown area";
+}
 
 // ---------------------------------------------------------------------
 // 1. Connect to Supabase
@@ -16,7 +72,10 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_MHFAislgYRdCkLn1RyTRSA_KkVy0jUK
 // The CDN script in index.html creates a global `supabase` object.
 // createClient() gives us a client we use for all database calls.
 // We call it `db` so it doesn't clash with that global name.
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// On an unknown area there's no client at all: the client can contact
+// Supabase on its own (e.g. to refresh a saved session), and a mistyped
+// link should send nothing (issue #37).
+const db = AREA === null ? null : supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // The <main id="item-list"> element we fill with the list.
 const listEl = document.getElementById("item-list");
@@ -110,6 +169,10 @@ function withTimeout(promise, ms) {
 // ---------------------------------------------------------------------
 // 3. Load the items from the database
 // ---------------------------------------------------------------------
+// Only this page's list: rows whose area is this page's area, or
+// "shared" (items both teams use, shown in both lists with one status).
+// Both tabs (Count and Dashboard) load through here, so this is the only
+// place the list is filtered (issue #37).
 // sort_order is the shelf order. If two rows share a sort_order, id
 // breaks the tie so the order is always the same on every phone.
 // Like saves, loads give up after a while, so a hanging connection ends
@@ -120,7 +183,8 @@ const LOAD_TIMEOUT_MS = 15 * 1000;
 async function loadItems() {
   const { data, error, status } = await db
     .from("items")
-    .select("id, name, category, sort_order, status, updated_at")
+    .select("id, name, category, sort_order, status, updated_at, area")
+    .in("area", [AREA, "shared"])
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true })
     .abortSignal(AbortSignal.timeout(LOAD_TIMEOUT_MS));
@@ -724,7 +788,12 @@ function showTab(name) {
 // Some private-browsing modes block localStorage or throw an error when
 // it's touched, so every use is wrapped in try/catch: if storage doesn't
 // work, the app simply opens on Count each time.
-const LAST_TAB_KEY = "cafe-inventory:last-tab";
+//
+// Each list has its own key (issue #37, see AREAS in section 0): the
+// kitchen keeps "cafe-inventory:last-tab", front of house uses
+// "cafe-inventory:last-tab:foh", so switching tabs in one list never
+// changes where the other list reopens.
+const LAST_TAB_KEY = areaSettings?.lastTabKey;
 
 function saveLastTab(name) {
   try {
@@ -1031,7 +1100,9 @@ async function loadCount() {
 
 // Reloads whichever tab is showing, and only that one (one load per
 // return): Count (issue #18) or the Dashboard, quietly (issue #24).
+// On the "Unknown area" screen there's nothing to load (issue #37).
 function reloadShownTab() {
+  if (AREA === null) return;
   if (!countView.hidden) {
     loadCount();
   } else {
@@ -1057,7 +1128,21 @@ window.addEventListener("pageshow", (event) => {
 // ---------------------------------------------------------------------
 // Load only the tab that opens. If it's the Dashboard, the Count list
 // loads when someone switches to Count (it shows "Loading..." then).
-if (readLastTab() === "dashboard") {
+//
+// An unknown area (issue #37) shows the "Unknown area" screen instead:
+// the tabs and both lists are hidden, and nothing signs in, loads or
+// saves, so a mistyped link can't change any status (or even create an
+// anonymous user).
+function showUnknownArea() {
+  document.querySelector(".tabs").hidden = true;
+  countView.hidden = true;
+  dashboardView.hidden = true;
+  document.getElementById("unknown-area").hidden = false;
+}
+
+if (AREA === null) {
+  showUnknownArea();
+} else if (readLastTab() === "dashboard") {
   showTab("dashboard");
   loadDashboard(); // fresh, the same as switching to it
 } else {
