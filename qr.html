@@ -2,9 +2,14 @@
 <html lang="en">
 
 <!--
-  qr.html - printable QR code for the kitchen wall (issue #4).
+  qr.html - printable QR code signs (issue #4; front of house, issue #39).
   Open this page and print it (Cmd+P / Ctrl+P). Scanning the code opens
-  the live app, which always starts on the Count tab.
+  the live app.
+    qr.html           -> the kitchen sign (opens the kitchen list)
+    qr.html?area=foh  -> the barista station sign (opens the
+                         front-of-house list, ?area=foh)
+  Any other ?area shows a message instead of a code, so a wrong sign
+  can't be printed.
 -->
 
 <head>
@@ -63,6 +68,17 @@
       cursor: pointer;
     }
 
+    /* "Unknown area: no sign printed" (issue #39): big and bold. */
+    .unknown-area {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    /* Make sure `hidden` elements stay hidden. */
+    [hidden] {
+      display: none !important;
+    }
+
     /* When printing: no Print button, and keep the sign on one page. */
     @media print {
       body { padding: 0; }
@@ -81,6 +97,10 @@
 
   <button type="button" class="print-button" onclick="window.print()">Print</button>
 
+  <!-- Shown instead of the sign and the Print button when ?area= isn't
+       a known list (issue #39). -->
+  <p class="unknown-area" id="unknown-area" hidden>Unknown area: no sign printed</p>
+
   <!-- QR code library (pinned version), from the jsDelivr CDN -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script>
@@ -89,25 +109,68 @@
     // testing on localhost still points at the real app.
     const APP_URL = "https://delgadowrites.github.io/cafe-inventory/";
 
-    // qrcode(0, "Q"):
-    //   0   = pick the smallest QR size that fits the URL
-    //   "Q" = high error correction: still scans if ~25% of the code is
-    //         smudged or splashed, which helps on a kitchen wall.
-    const qr = qrcode(0, "Q");
-    qr.addData(APP_URL);
-    qr.make();
+    // One sign per list (issue #39), all in this one table:
+    //   url:     what the code opens (the live app, plus ?area= for FOH)
+    //   heading: the big text above the code
+    //   label:   what screen readers say for the code
+    //   title:   the browser tab's title
+    // The kitchen entry is exactly the original sign, so the posted
+    // kitchen sign prints the same as before. No phone numbers here: the
+    // repo is public, so Carlos writes his number on the printed sign.
+    const SIGNS = {
+      kitchen: {
+        url: APP_URL,
+        heading: "Scan to update inventory",
+        label: "QR code that opens the Cafe Inventory app",
+        title: "Cafe Inventory QR Code",
+      },
+      foh: {
+        url: APP_URL + "?area=foh",
+        heading: "Scan to update front-of-house inventory",
+        label: "QR code that opens the Front of House Inventory list",
+        title: "Front of House Inventory QR Code",
+      },
+    };
 
-    // Draw it as an SVG (crisp at any print size).
-    // margin: 4 cells of white border, the "quiet zone" scanners need.
-    // scalable: lets the CSS above set the size.
-    document.getElementById("qr").innerHTML = qr.createSvgTag({
-      cellSize: 8,
-      margin: 4,
-      scalable: true,
-    });
+    // Which sign: ?area= from this page's address, with spaces and
+    // capitals ignored (like the app). Missing or empty = the kitchen.
+    // Anything not in SIGNS (a typo like ?area=bar) gets no sign.
+    const area = (new URLSearchParams(location.search).get("area") ?? "")
+      .trim()
+      .toLowerCase() || "kitchen";
+    const sign = Object.keys(SIGNS).includes(area) ? SIGNS[area] : null;
 
-    // Print the URL under the code too.
-    document.getElementById("qr-url").textContent = APP_URL;
+    if (sign === null) {
+      // Unknown area: hide the sign and the Print button and say why,
+      // so a sign for the wrong list (or no list) can't be printed.
+      document.querySelector(".sign").hidden = true;
+      document.querySelector(".print-button").hidden = true;
+      document.getElementById("unknown-area").hidden = false;
+    } else {
+      document.title = sign.title;
+      document.querySelector("h1").textContent = sign.heading;
+      document.getElementById("qr").setAttribute("aria-label", sign.label);
+
+      // qrcode(0, "Q"):
+      //   0   = pick the smallest QR size that fits the URL
+      //   "Q" = high error correction: still scans if ~25% of the code is
+      //         smudged or splashed, which helps on a kitchen wall.
+      const qr = qrcode(0, "Q");
+      qr.addData(sign.url);
+      qr.make();
+
+      // Draw it as an SVG (crisp at any print size).
+      // margin: 4 cells of white border, the "quiet zone" scanners need.
+      // scalable: lets the CSS above set the size.
+      document.getElementById("qr").innerHTML = qr.createSvgTag({
+        cellSize: 8,
+        margin: 4,
+        scalable: true,
+      });
+
+      // Print the URL under the code too.
+      document.getElementById("qr-url").textContent = sign.url;
+    }
   </script>
 </body>
 
