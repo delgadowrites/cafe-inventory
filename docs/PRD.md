@@ -152,6 +152,78 @@ A static front end on GitHub Pages talks directly to a Supabase Postgres databas
 - [ ] Does the owner approve the QR code on the kitchen wall?
 - [ ] Final cleaned-up item list (Carlos drafts, GM confirms).
 
+## Version 2: Front of house
+
+The barista station (front of house, FOH) gets its own QR code and list inside the same app and the same `items` table. It will be tested in the cafe on Fri, Nov 27, 2026. Decided Thu, Nov 26. The GM asked for it on Nov 23. This replaces the v1 non-goal "Front-of-house inventory".
+
+### Problem (FOH)
+
+Baristas write a manual list for every inventory, take a picture of it and text it to the GM. It is time-consuming, and nobody has timed it, so there is no baseline time yet. On Friday, a barista estimates how long the handwritten list usually takes.
+
+### Decisions (Nov 26)
+
+| # | Topic | Decision |
+| --- | --- | --- |
+| 1 | App | Same app and repo. The link decides the area: `?area=foh` = FOH. No `?area` = kitchen, so the posted kitchen QR keeps working |
+| 2 | `area` column | `text not null`, check allows `kitchen`, `foh`, `shared`. Existing rows get `kitchen` through a default, then the default is dropped so every new row must name its area |
+| 3 | Items both teams use | One row with `area = 'shared'`, shown in both apps with one status. Salt, Black Pepper, Honey (one container each, used by both teams) |
+| 4 | Shared heading | Category "Shared", `sort_order` 1000 / 1010 / 1020, at the bottom of both apps |
+| 5 | QR code and dashboard | Two QR codes printed from `qr.html` (plain = kitchen, `?area=foh` = FOH). Same Count and Dashboard tabs, filtered to the area plus Shared. Heading per area. Last tab remembered per area. Unknown area shows an "Unknown area" screen |
+| 6 | Staff security | Unchanged: scan and tap, no login |
+
+### Items
+
+FOH: 44 items in 7 categories, from the GM's list (spelling fixed, Title Case, Black Pepper and Salt moved to Shared). Kitchen phones show 48 items (45 kitchen + 3 Shared). FOH phones show 47 (44 FOH + 3 Shared).
+
+| Category | `sort_order` | Items, in order |
+| --- | --- | --- |
+| Milks | 10–70 | Heavy Cream, Half and Half, Coconut Milk, Oat Milk, Almond Milk, Whole Milk, Skim Milk |
+| Sauces | 80–110 | Maple Syrup, Caramel, Mocha, White Mocha |
+| Extracts | 120–180 | Vanilla, Pistachio, Hazelnut, Lavender, Coconut, Rose, Raspberry |
+| Spices | 190–260 | White Sugar, Brown Sugar, Cardamom, Cinnamon, Allspice, Nutmeg, Ginger, Cloves |
+| Tea | 270–300 | Matcha, Chamomile, Earl Grey, Red Raspberry |
+| Beans | 310 | Brazil |
+| Dry Goods / Packaging | 320–440 | 12 oz Hot Cups, 16 oz Hot Cups, Hot Lids (Both Sizes), Cup Sleeves, 12 oz Iced Cups, 16 oz Iced Cups, Cold Lids (Both Sizes), Cortado Cups / Lids, Straws, Stir Sticks, Drink Trays, Napkins, Paper Bags |
+| Shared (both areas) | 1000–1020 | Salt, Black Pepper, Honey |
+
+### Data model change
+
+New column on `items`: `area` (text, not null; only `kitchen`, `foh` or `shared`, enforced by a check constraint). App users can read it but not change it: they still update `status` only.
+
+The order matters, or the kitchen app breaks:
+
+1. Carlos runs `sql/05-add-area.sql` (adds the column; the current kitchen code ignores it).
+2. The filter code is merged (it needs the column to exist).
+3. Carlos runs `sql/06-foh-items.sql` (FOH rows and the Shared switch go in only once the kitchen app filters them).
+
+### Requirements (FOH)
+
+| # | User story | Acceptance criteria |
+| --- | --- | --- |
+| R11 | As a barista, I scan the FOH QR code so I open the barista list. | `…/cafe-inventory/?area=foh` shows "Front of House Inventory" with FOH and Shared items only (47) |
+| R12 | As kitchen staff, I scan the same kitchen QR code as before. | No `?area` shows "Kitchen Inventory" with kitchen and Shared items only (48). Everything else works as in v1 |
+| R13 | As anyone, I see one status for a Shared item so both teams trust it. | A tap in one area shows in the other area after a refresh |
+| R14 | As the GM, I open each area's Dashboard as its own shopping list. | Each Dashboard shows its area plus Shared, with the v1 layout (R7, R8) |
+| R15 | As staff, my phone reopens each list on the tab I last used there. | Kitchen keeps the key `cafe-inventory:last-tab`; FOH uses `cafe-inventory:last-tab:foh` |
+| R16 | As anyone with a mistyped link, I don't tap the wrong list. | An unknown area shows "Unknown area" with links to both lists, loads no items and saves nothing |
+| R17 | As the maintainer, every item belongs to an area. | The database refuses a row with no area or any value other than `kitchen`, `foh`, `shared` |
+
+### Rollout and Friday test
+
+1. Thu night: run `05`, merge the filter PR, run `06`, merge the rest. Print the FOH sign and write Carlos's number on it by hand (the repo is public, so the number stays out of the code).
+2. Fri, first thing: kitchen check (kitchen QR opens "Kitchen Inventory", 48 items, Shared at the bottom, last tab remembered).
+3. Fri, first thing: FOH check (FOH QR opens "Front of House Inventory", 47 items, both tabs filtered).
+4. During the shift: a barista taps Honey Low; the kitchen phone shows Low after a refresh, and the reverse.
+5. End of shift: first FOH walk sets the real statuses (all FOH items start Good). Carlos times it; this is the FOH baseline.
+6. Tell baristas that weak Wi-Fi can show "Still connecting..." for about 30 s.
+7. If Friday goes wrong: run `sql/99-rollback-foh.sql` first (removes the FOH rows and moves the Shared items back to the kitchen), then revert the code. Reverting the code alone is not enough: the old kitchen code has no filter and would show every FOH row.
+
+### Non-goals (v2 FOH)
+
+History, GM sign-in with item management, Out alerts, reports, a combined dashboard and a Square connection are later work. Nothing in this version blocks them: GM item management would pick from the same three areas.
+
+**Tracking:** GitHub Issues A–G (filed Nov 26).
+
 ## Future versions
 
 | Feature | What it adds |
@@ -161,6 +233,6 @@ A static front end on GitHub Pages talks directly to a Supabase Postgres databas
 | Status history | A log of every change, to answer "what runs out most often?" |
 | Live updates | The dashboard changes on screen when anyone taps (Supabase Realtime) |
 | Numeric counts and par levels | Quantities with per-item thresholds that set Low automatically |
-| Front of house | Barista inventory, offered if the kitchen version succeeds |
+| Front of house | Barista inventory: now Version 2 (see above), testing Fri, Nov 27 |
 | Supplies | Front-of-house supplies |
 | Whole-cafe inventory | Long-term: one inventory tracking system for the entire cafe |

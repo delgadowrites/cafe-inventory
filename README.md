@@ -1,15 +1,17 @@
 # Cafe Inventory Tracker
 
-A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **Low** or **Good**, and the GM uses the Dashboard as a shopping list.
+A phone app for the cafe's stock lists: one for the kitchen, one for the barista station (front of house, FOH). Staff mark each item **Out**, **Low** or **Good**, and the GM uses each list's Dashboard as a shopping list.
 
-- **Live app:** https://delgadowrites.github.io/cafe-inventory/
-- **Printable QR code for the wall:** https://delgadowrites.github.io/cafe-inventory/qr.html
+- **Kitchen list:** https://delgadowrites.github.io/cafe-inventory/
+- **Front-of-house list:** https://delgadowrites.github.io/cafe-inventory/?area=foh
+- **Printable QR signs:** kitchen wall https://delgadowrites.github.io/cafe-inventory/qr.html, barista station https://delgadowrites.github.io/cafe-inventory/qr.html?area=foh
 - **PRD:** [docs/PRD.md](docs/PRD.md)
 - **Launch checklist:** [docs/launch-checklist.md](docs/launch-checklist.md)
 
 ## What it does
 
-- Opens with no login. **Each phone reopens on the tab it was last on** (Count or Dashboard); a phone opening it for the first time starts on **Count**. Only the tab is remembered, on that phone. Every kitchen item is listed under its category heading, in shelf order.
+- **Two lists in one app.** The link decides which one: no `?area` opens **Kitchen Inventory**, `?area=foh` opens **Front of House Inventory**. Each list shows only its own items, plus the **Shared** items (Salt, Black Pepper, Honey: one container each, used by both teams) under a "Shared" heading at the bottom. A Shared item has **one status**: a tap in either list shows in the other after a refresh. A mistyped link (e.g. `?area=bar`) shows an "Unknown area" screen with links to both lists, and loads and saves nothing.
+- Opens with no login. **Each phone reopens on the tab it was last on** (Count or Dashboard); a phone opening it for the first time starts on **Count**. Only the tab is remembered, on that phone, and separately for each list. Every item in the list is listed under its category heading, in shelf order.
 - Each item has **Out / Low / Good** buttons and shows how long ago it was last updated ("just now", "15m ago", "2h ago", "3d ago").
 - A tap is saved to the database first. The highlight moves only when the save worked. If it didn't (bad wifi), the item says **"Didn't save, tap again"**.
 - The **Count** list reloads whenever it comes back into view: when the phone returns to the page (from another app, or after unlocking) and when you switch from Dashboard back to Count. Items being saved, or showing "Didn't save", are left as they are. If the reload fails, the list stays and a yellow bar says it couldn't be refreshed, with a **Try again** button.
@@ -26,8 +28,13 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 3. If an item is still fine, tap **Good** again anyway. That refreshes its time, so the GM knows it was checked tonight.
 4. If you see **"Didn't save, tap again"**, tap the same button again. Wait for the ✓ to move before going on.
 
+### Baristas (front of house)
+1. Scan the QR code at the barista station. It opens **Front of House Inventory**.
+2. The rest is the same as the kitchen walk above: tap **Out**, **Low** or **Good** for each item, tap **Good** again on items that are still fine, and re-tap if you see **"Didn't save, tap again"**.
+3. Salt, Black Pepper and Honey are under **Shared** at the bottom. The kitchen sees the same status for them.
+
 ### GM (shopping and restocking)
-1. Open the app and tap **Dashboard**. Out items are at the top, then Low. After the first time, your phone reopens straight on the Dashboard.
+1. Open the list you're shopping for (kitchen or front of house) and tap **Dashboard**. Each list has its own Dashboard, with the Shared items in both. Out items are at the top, then Low. After the first time, your phone reopens straight on the Dashboard.
 2. Use it as the shopping list. Tap **Refresh** if staff are updating while you look. **Good** items are folded away; tap the Good heading to see them.
 3. After restocking, go to **Count** and tap **Good** on each restocked item.
 
@@ -35,11 +42,13 @@ A phone app for the cafe kitchen's stock list. Staff mark each item **Out**, **L
 
 The app can only change an item's **status**. Items themselves are managed in Supabase: project **cafe-inventory** → **Table Editor** → `items`.
 
-**`sort_order` sets the shelf order.** Items are numbered in steps of 10 (10, 20, 30...), and categories appear in the order of their first item.
+**`area` sets which list an item is in:** `kitchen`, `foh` (front of house) or `shared` (both lists, one status). It's required: the database refuses a row without it, or with any other value.
+
+**`sort_order` sets the shelf order, per list.** Items are numbered in steps of 10 (10, 20, 30...), and categories appear in the order of their first item. Each list counts on its own: the front-of-house list starts at 10 too. Shared items use 1000 and up, so the "Shared" heading comes last in both lists.
 
 | To... | Do this |
 |---|---|
-| **Add an item** | Insert a row. Fill in `name` and `category` (spelled exactly like the existing category, e.g. `Dairy`), and a `sort_order` between the two items it sits between on the shelf (e.g. `75` between `70` and `80`). Leave `status` and `updated_at` empty: they default to `good` and now. Leave `id` empty too, so the Table Editor generates it. |
+| **Add an item** | Insert a row. Fill in `name`, `area` (`kitchen`, `foh` or `shared`; required) and `category` (spelled exactly like the existing category, e.g. `Dairy`; Shared items use `Shared` and then show under the "Shared" heading in both lists), and a `sort_order` between the two items it sits between on the shelf (e.g. `75` between `70` and `80`). Leave `status` and `updated_at` empty: they default to `good` and now. Leave `id` empty too, so the Table Editor generates it. |
 | **Remove an item** | Delete its row. |
 | **Rename an item** | Edit `name`. |
 | **Move an item** | Change its `sort_order`. |
@@ -56,10 +65,10 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 
 | File | What it is |
 |---|---|
-| `index.html` | Page structure: tabs, Count list, Dashboard |
-| `script.js` | Sign-in, loading, saving, Dashboard, "X ago" times (commented section by section) |
+| `index.html` | Page structure: tabs, Count list, Dashboard, "Unknown area" screen |
+| `script.js` | Which list (`?area`), sign-in, loading, saving, Dashboard, "X ago" times (commented section by section) |
 | `style.css` | Phone-first, high-contrast styles; status colors are CSS variables at the top |
-| `qr.html` | Printable QR code sign |
+| `qr.html` | Printable QR code signs: `qr.html` prints the kitchen sign, `qr.html?area=foh` the front-of-house sign |
 | `sql/` | Database changes, run in order in the Supabase SQL Editor |
 
 ### Database permissions (`sql/`)
