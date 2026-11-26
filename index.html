@@ -13,6 +13,9 @@
 </head>
 
 <body>
+  <!-- One page for both lists: the link decides which (no ?area = the
+       kitchen, ?area=foh = front of house). script.js sets this heading
+       and the tab title for the list before it loads (issue #37). -->
   <h1>Kitchen Inventory</h1>
 
   <!-- Tab buttons. aria-selected marks the open tab; script.js switches them.
@@ -25,7 +28,8 @@
   </nav>
 
   <main>
-    <!-- Count tab: every item in shelf order with Out / Low / Good buttons.
+    <!-- Count tab: every item in this list (plus the Shared items), in
+         shelf order, with Out / Low / Good buttons.
          JavaScript fills #item-list with a heading and items per category. -->
     <section id="count-view" role="tabpanel" aria-labelledby="tab-count">
       <div id="item-list"></div>
