@@ -62,6 +62,15 @@
         <button type="button" id="dashboard-retry" class="retry-button">Try again</button>
       </div>
     </section>
+
+    <!-- Shown instead of the tabs and lists when the link's ?area= isn't
+         a list the app knows (a typo like ?area=bar, issue #37). script.js
+         shows it; on this screen nothing signs in, loads or saves. -->
+    <section id="unknown-area" hidden>
+      <p class="message">This link doesn't match a list. Open one of these:</p>
+      <a class="area-link" href="./">Kitchen</a>
+      <a class="area-link" href="./?area=foh">Front of House</a>
+    </section>
   </main>
 
   <!-- Supabase library first (from the CDN), then your script, which uses it.

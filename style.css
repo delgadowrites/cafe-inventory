@@ -421,3 +421,31 @@ body:has(.refresh-notice:not([hidden])) {
   margin: 10px 0;
   color: var(--muted);
 }
+
+/* ---------- Unknown area screen (issue #37) ---------- */
+
+/* The two links (Kitchen, Front of House): full-width, 56px tall, black
+   on white with a thick border, the same look as the Refresh button. */
+.area-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  margin: 12px 0;
+  font-weight: bold;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.area-link:active {
+  background: #e6e6e6;
+}
+
+.area-link:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 2px;
+}
