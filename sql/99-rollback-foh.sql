@@ -71,9 +71,10 @@ commit;
 -- ---------------------------------------------------------------------
 -- Optional checks (run after the file)
 -- ---------------------------------------------------------------------
--- Rows by area: expect ONE row, kitchen 48 (45 + Salt, Black Pepper,
--- Honey). A `shared` row here is an item added to Shared by hand since
--- 06: move it to the kitchen in the Table Editor (or delete it) before
+-- Rows by area: expect ONE row, kitchen 52 (49 + Salt, Black Pepper,
+-- Honey; the 49 includes the 4 kitchen items added on Nov 27, see 07).
+-- A `shared` row here is an item added to Shared by hand since 06:
+-- move it to the kitchen in the Table Editor (or delete it) before
 -- reverting the code, or it shows under a "Shared" heading.
 select area, count(*) as items
 from public.items

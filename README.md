@@ -81,6 +81,7 @@ Changes show up when the app is reloaded (Count) or the Dashboard is opened or r
 | `04-revoke-extra-privileges.sql` | **Live project.** Removes TRUNCATE, REFERENCES and TRIGGER from app users (leftovers the app never used), so they can only read and change status. Not needed for a rebuild: `00` never grants them. |
 | `05-add-area.sql` | Adds the `area` column: which list a row belongs to (`kitchen`, `foh` or `shared`). Existing rows get `kitchen`; after that there's no default, so every new row must name its area, and the database refuses any other value. App users can read `area` but not change it. **Live project:** run before merging the "Load one area from the link" change (#37). |
 | `06-foh-items.sql` | Adds the 44 front-of-house items (7 categories, `area = 'foh'`) and moves Salt and Black Pepper, plus a new Honey, to a **Shared** heading (`area = 'shared'`, `sort_order` 1000 / 1010 / 1020) that shows at the bottom of both lists with one status. Salt and Black Pepper keep their status; Black Pepper is added if it's missing. A second run stops with an error and changes nothing. **Live project:** run only after #37 is merged and live. |
+| `07-kitchen-items-nov27.sql` | **Already ran on the live project (Nov 27, added by hand).** A record for rebuilds: adds Strawberry Cream Cheese and Maple Walnut Cream Cheese (Dairy), Gloves (Cleaning) and Wrapping Paper (Packaging) to the kitchen list. Each item is only added if its name isn't there yet, so running it on the live project changes nothing. Runs after `06`. |
 | `99-rollback-foh.sql` | **Not run. Only to undo the front-of-house launch**, before reverting the code: see "Undo the front-of-house launch" below. |
 
 Row Level Security is on. There are no insert or delete permissions for app users: items are only added or removed in the Table Editor.
@@ -90,7 +91,7 @@ If the Supabase project is ever lost or paused for good, everything can be rebui
 
 1. Create a **new** Supabase project (free tier).
 2. Turn on anonymous sign-ins: **Authentication** → **Sign In / Providers** → **Allow anonymous sign-ins**.
-3. In the **SQL Editor**, run the files in `sql/` in order, one at a time: `00-schema.sql`, `01-grant-read.sql`, `02-update-status.sql`, `03-keep-manual-updated-at.sql`, `05-add-area.sql`, `06-foh-items.sql`. After `00`, its check queries should show 46 items in 10 categories. `05` and `06` run after `03` (`04` isn't needed): the project gets `00`'s 46 kitchen items, then `06` adds Black Pepper, Honey and the front-of-house items, so its check queries should show `kitchen` 45, `foh` 44, `shared` 3.
+3. In the **SQL Editor**, run the files in `sql/` in order, one at a time: `00-schema.sql`, `01-grant-read.sql`, `02-update-status.sql`, `03-keep-manual-updated-at.sql`, `05-add-area.sql`, `06-foh-items.sql`, `07-kitchen-items-nov27.sql`. After `00`, its check queries should show 46 items in 10 categories. `05`, `06` and `07` run after `03` (`04` isn't needed): the project gets `00`'s 46 kitchen items, then `06` adds Black Pepper, Honey and the front-of-house items, and `07` adds the four kitchen items from Nov 27, so `07`'s check queries should show `kitchen` 49, `foh` 44, `shared` 3.
 4. Copy the new project's URL and **publishable** key (**Project Settings** → **API Keys**) into `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of `script.js`, then commit to `main`.
 5. Retest: items load, a tap saves, the Dashboard loads.
 
@@ -99,7 +100,7 @@ Every item starts as **Good** in the new project, so do a full walk to set the r
 ### Undo the front-of-house launch
 Only if the front-of-house (FOH) list has to come out. Do these **in this order**:
 
-1. **Run `sql/99-rollback-foh.sql`** in the Supabase SQL Editor. It deletes the 44 FOH items and moves Salt, Black Pepper and Honey back into the kitchen list (Dry Goods / Spices and Condiments / Sauces), keeping their statuses. Its check query should show only `kitchen`, 48 items.
+1. **Run `sql/99-rollback-foh.sql`** in the Supabase SQL Editor. It deletes the 44 FOH items and moves Salt, Black Pepper and Honey back into the kitchen list (Dry Goods / Spices and Condiments / Sauces), keeping their statuses. Its check query should show only `kitchen`, 52 items (49 kitchen + Salt, Black Pepper, Honey).
 2. **Then revert the code:** revert the FOH pull requests on GitHub, newest first, or revert `main` to the commit before #37's merge (PR #44).
 3. **Kitchen check on a phone:** the kitchen QR opens "Kitchen Inventory" with Salt, Black Pepper and Honey back in their categories, a tap saves, and the Dashboard loads. Take the FOH QR sign down from the barista station.
 
